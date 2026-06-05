@@ -1,93 +1,93 @@
-# Quality Document — DB Demo Studio
+# 质量文档 — DB Demo Studio
 
-## Scoring Summary
+## 评分概要
 
-| Dimension | Grade | Notes |
+| 维度 | 等级 | 备注 |
 |-----------|-------|-------|
-| Build & Compile | Pending | Development not started |
-| Feature Completeness | Pending | 0/10 features implemented |
-| WebSocket Protocol | Pending | Events defined in docs, not implemented |
-| REST API | Pending | Endpoints defined in docs, not implemented |
-| AI Agent Runtime | Pending | Architecture designed, not implemented |
-| P0 Instant Demo | Pending | 6-stage pipeline designed, not implemented |
-| P1 Visualization | Pending | Mermaid/ECharts integration planned |
-| P2 Simulator | Pending | B+tree/transaction/SQL simulators planned |
-| Quiz & Assessment | Pending | 3 question types designed |
-| Classroom Broadcast | Pending | Redis Pub/Sub architecture designed |
-| Search & Export | Pending | 4 export formats planned |
-| Curriculum RAG | Pending | pgvector integration planned |
-| Structured Logging | Pending | JSON format and log points defined in RELIABILITY.md |
-| Clean State Reset | Pending | Architecture designed in RELIABILITY.md |
-| Persistence | Pending | PG schema + Redis key patterns designed |
-| Test Coverage | Pending | Framework chosen (pytest + vitest) |
-| Documentation | A | 6 docs files covering all aspects |
-| Harness Quality | A | 15 harness files, all complete and consistent |
+| 构建与编译 | 待定 | 开发尚未开始 |
+| 功能完整性 | 待定 | 0/10 个功能已实现 |
+| WebSocket 协议 | 待定 | 事件已在文档中定义，尚未实现 |
+| REST API | 待定 | 端点已在文档中定义，尚未实现 |
+| AI Agent 运行时 | 待定 | 架构已设计，尚未实现 |
+| P0 即时演示 | 待定 | 6 阶段流水线已设计，尚未实现 |
+| P1 可视化 | 待定 | Mermaid/ECharts 集成已规划 |
+| P2 模拟器 | 待定 | B+树/事务/SQL 模拟器已规划 |
+| 测验与评估 | 待定 | 3 种题型已设计 |
+| 课堂广播 | 待定 | Redis Pub/Sub 架构已设计 |
+| 搜索与导出 | 待定 | 4 种导出格式已规划 |
+| 课纲 RAG | 待定 | pgvector 集成已规划 |
+| 结构化日志 | 待定 | JSON 格式和日志点在 RELIABILITY.md 中已定义 |
+| 清理状态重置 | 待定 | 架构已在 RELIABILITY.md 中设计 |
+| 数据持久化 | 待定 | PG schema + Redis 键模式已设计 |
+| 测试覆盖率 | 待定 | 已选定框架（pytest + vitest）|
+| 文档 | A | 6 个文档文件覆盖所有方面 |
+| Harness 质量 | A | 15 个 Harness 文件，完整且一致 |
 
-## Overall Grade: N/A (pre-development)
+## 总体等级：N/A（开发前阶段）
 
-## Documentation Audit
+## 文档审计
 
-### Docs Completeness
+### 文档完整性
 
-| Document | Status | Coverage |
+| 文档 | 状态 | 覆盖范围 |
 |----------|--------|----------|
-| requirements-spec.md | ✅ Complete | Full v5 spec, 593 lines |
-| ARCHITECTURE.md | ✅ Complete | System overview, layers, data flow, protocols, schemas |
-| PRODUCT.md | ✅ Complete | User stories, interaction patterns, all P0/P1/P2 features |
-| RELIABILITY.md | ✅ Complete | Logging, clean state, benchmarking, error handling, performance targets |
-| harness-development-guide.md | ✅ Complete | Methodology guide for harness-driven development |
-| harness-v2-plan.md | ✅ Complete | Redesign plan with design rationale and ADRs |
+| requirements-spec.md | ✅ 完整 | v5 完整规格，593 行 |
+| ARCHITECTURE.md | ✅ 完整 | 系统总览、层、数据流、协议、模式 |
+| PRODUCT.md | ✅ 完整 | 用户故事、交互模式、所有 P0/P1/P2 功能 |
+| RELIABILITY.md | ✅ 完整 | 日志、清理状态、基准测试、错误处理、性能目标 |
+| harness-development-guide.md | ✅ 完整 | Harness 驱动开发方法论指南 |
+| harness-v2-plan.md | ✅ 完整 | 重设计方案含设计理由和 ADR |
 
-### Harness Completeness
+### Harness 完整性
 
-| File | Status | Lines |
+| 文件 | 状态 | 行数 |
 |------|--------|-------|
-| AGENTS.md | ✅ Complete | ~100 |
-| CLAUDE.md | ✅ Complete | ~90 |
-| feature_list.json | ✅ Complete | 10 features |
-| init.sh | ✅ Complete | ~50 |
-| progress.md | ✅ Complete | Active session log |
-| session-handoff.md | ✅ Complete | Active |
-| clean-state-checklist.md | ✅ Complete | 30+ items, 7 categories |
-| evaluator-rubric.md | ✅ Complete | 15 dimensions, scoring criteria |
-| quality-document.md | ✅ Complete | This file |
+| AGENTS.md | ✅ 完整 | ~100 |
+| CLAUDE.md | ✅ 完整 | ~90 |
+| feature_list.json | ✅ 完整 | 10 个功能 |
+| init.sh | ✅ 完整 | ~50 |
+| progress.md | ✅ 完整 | 活跃的会话日志 |
+| session-handoff.md | ✅ 完整 | 活跃 |
+| clean-state-checklist.md | ✅ 完整 | 7 个分类 30+ 项 |
+| evaluator-rubric.md | ✅ 完整 | 15 个维度，评分标准 |
+| quality-document.md | ✅ 完整 | 本文件 |
 
-### Architecture Design Completeness
+### 架构设计完整性
 
-| Component | Design Status |
+| 组件 | 设计状态 |
 |-----------|---------------|
-| Frontend (React 19 + Vite 8) | Architecture designed |
-| Backend (FastAPI + Uvicorn) | Architecture designed |
-| WebSocket Protocol | 20 events defined (10 client→server, 10 server→client) |
-| REST API | 10 endpoints defined |
-| LLM Gateway | Provider chain + caching strategy designed |
-| MCP Tool Layer | 6 servers planned, protocol defined |
-| Redis | 8 key patterns designed |
-| PostgreSQL | 5 tables with schema defined |
+| 前端（React 19 + Vite 8）| 架构已设计 |
+| 后端（FastAPI + Uvicorn）| 架构已设计 |
+| WebSocket 协议 | 已定义 20 个事件（10 个客户端→服务端，10 个服务端→客户端）|
+| REST API | 已定义 10 个端点 |
+| LLM 网关 | Provider 链 + 缓存策略已设计 |
+| MCP 工具层 | 6 个服务已规划，协议已定义 |
+| Redis | 8 个键模式已设计 |
+| PostgreSQL | 5 张表带 schema 已设计 |
 | Docker | MySQL 8.0 :3308 + PostgreSQL 16 :5433 |
 
-## Planned Performance Targets
+## 计划性能目标
 
-| Metric | Target | Measurement Method |
+| 指标 | 目标 | 测量方法 |
 |--------|--------|-------------------|
-| Conversation switch latency | < 200ms | conv:switch → conv:loaded event timing |
-| Recent messages (50) | < 100ms | Redis LRANGE timing |
-| Full message history | < 500ms | PG SELECT timing |
-| WebSocket reconnect recovery | < 1s | Disconnect → UI restored |
-| AI first-frame response | < 500ms | chat:message → agent:thinking |
-| LLM cache hit rate | > 30% | hit / (hit + miss) |
-| Classroom broadcast latency | < 100ms | player:seek → student received |
-| Concurrent students | > 200 | Load test tool |
-| Frontend bundle size | < 400KB | vite build output |
+| 对话切换延迟 | < 200ms | conv:switch → conv:loaded 事件计时 |
+| 最近消息（50 条）| < 100ms | Redis LRANGE 计时 |
+| 完整消息历史 | < 500ms | PG SELECT 计时 |
+| WebSocket 重连恢复 | < 1s | 断连 → 界面恢复 |
+| AI 首帧响应 | < 500ms | chat:message → agent:thinking |
+| LLM 缓存命中率 | > 30% | 命中 /（命中 + 未命中）|
+| 课堂广播延迟 | < 100ms | player:seek → 学生端收到 |
+| 并发学生数 | > 200 | 压测工具 |
+| 前端打包体积 | < 400KB | vite build 输出 |
 
-## Prepared For Development
+## 开发就绪检查
 
-- [x] Git branch structure (p01-baseline / p01-improved / project-01 / project-02)
-- [x] Full harness file set (15 files)
-- [x] Complete documentation (6 docs)
-- [x] 10 features defined with dependencies
-- [x] Architecture with layer boundaries
-- [x] Quality gate design (5-layer: compile → unit → integration → architecture → product)
-- [x] Clean state checklist (30+ items)
-- [x] Benchmark task suite design
-- [ ] feat-001: Project Scaffold & Conversation Infrastructure — **START HERE**
+- [x] Git 分支结构（p01-baseline / p01-improved / project-01 / project-02）
+- [x] 完整 Harness 文件集（15 个文件）
+- [x] 完整文档（6 篇）
+- [x] 10 个功能已定义含依赖关系
+- [x] 架构含层边界
+- [x] 质量闸门设计（5 层：编译→单元→集成→架构→产品）
+- [x] 清理状态检查清单（30+ 项）
+- [x] 基准测试任务套件设计
+- [ ] feat-001: 项目脚手架与对话基础设施 — **从这里开始**

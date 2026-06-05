@@ -1,92 +1,92 @@
-# Evaluator Rubric — DB Demo Studio
+# 评估评分卡 — DB Demo Studio
 
-## Overall Assessment
+## 总体评价
 
-**Project**: AI 协作式数据库课程演示工作台  
-**Evaluator**: Harness Quality Review  
-**Date**: 2026-06-05
+**项目**：AI 协作式数据库课程演示工作台  
+**评估人**：Harness 质量审查  
+**日期**：2026-06-05
 
-### Scoring (1-5 scale)
+### 评分（1-5 分制）
 
-| Criterion | Score | Notes |
+| 维度 | 分数 | 备注 |
 |-----------|-------|-------|
-| **Build & Compile** | - | Not yet implemented |
-| **WebSocket Connectivity** | - | Not yet implemented |
-| **Conversation CRUD** | - | Not yet implemented |
-| **AI Agent Runtime** | - | Not yet implemented |
-| **P0 Instant Demo** | - | Not yet implemented |
-| **P1 Visualization** | - | Not yet implemented |
-| **P2 Simulator** | - | Not yet implemented |
-| **Quiz & Assessment** | - | Not yet implemented |
-| **Classroom Broadcast** | - | Not yet implemented |
-| **Search & Export** | - | Not yet implemented |
-| **Curriculum RAG** | - | Not yet implemented |
-| **Performance Optimization** | - | Not yet implemented |
-| **Structured Logging** | - | Not yet implemented |
-| **Clean State Reset** | - | Not yet implemented |
-| **Harness Completeness** | 4 | 13/15 harness files present (scripts pending) |
+| **构建与编译** | - | 尚未实现 |
+| **WebSocket 连接** | - | 尚未实现 |
+| **对话 CRUD** | - | 尚未实现 |
+| **AI Agent 运行时** | - | 尚未实现 |
+| **P0 即时演示** | - | 尚未实现 |
+| **P1 可视化** | - | 尚未实现 |
+| **P2 模拟器** | - | 尚未实现 |
+| **测验与评估** | - | 尚未实现 |
+| **课堂广播** | - | 尚未实现 |
+| **搜索与导出** | - | 尚未实现 |
+| **课纲 RAG** | - | 尚未实现 |
+| **性能优化** | - | 尚未实现 |
+| **结构化日志** | - | 尚未实现 |
+| **清理状态重置** | - | 尚未实现 |
+| **Harness 完整性** | 4 | 15/15 个 Harness 文件齐全 |
 
-### Overall: - / 5 (development not started)
+### 总体评分：- / 5（开发尚未开始）
 
-### Scoring Criteria Per Dimension
+### 各维度评分标准
 
-| Score | Meaning |
+| 分数 | 含义 |
 |-------|---------|
-| **5** | Fully implemented with evidence (logs/tests/docs), no known issues |
-| **4** | Fully implemented with evidence, minor issues |
-| **3** | Basically complete, missing some evidence |
-| **2** | Implementation has defects or missing key verification |
-| **1** | Feature does not exist or completely broken |
-| **-** | Not yet started |
+| **5** | 完整实现并有证据（日志/测试/文档），无已知问题 |
+| **4** | 完整实现并有证据，有小问题 |
+| **3** | 基本完成，缺少部分证据 |
+| **2** | 实现有缺陷或缺少关键验证 |
+| **1** | 功能不存在或完全不工作 |
+| **-** | 尚未开始 |
 
-### Harness File Assessment
+### Harness 文件评估
 
-| File | Present | Quality | Notes |
+| 文件 | 是否存在 | 质量 | 备注 |
 |------|---------|---------|-------|
-| AGENTS.md | Yes | Complete | Startup rules, conventions, done definition, layer boundaries |
-| CLAUDE.md | Yes | Complete | Quick reference with API reference and "how to add feature" guide |
-| feature_list.json | Yes | Complete | 10 features with dependencies, pending status/evidence update |
-| init.sh | Yes | Needs Update | Missing harness file presence check and sample data verification |
-| progress.md | Yes | Active | Session log with decisions and next steps |
-| session-handoff.md | Yes | Active | Handoff template populated |
-| clean-state-checklist.md | Yes | Complete | 30+ check items across 7 categories |
-| evaluator-rubric.md | Yes | Complete | This file |
-| quality-document.md | Yes | Complete | Connected to this rubric |
+| AGENTS.md | 是 | 完整 | 启动规则、约定、完成定义、层边界 |
+| CLAUDE.md | 是 | 完整 | 快速参考含 API 参考和"如何添加功能"指南 |
+| feature_list.json | 是 | 完整 | 10 个功能含依赖关系，待更新状态/证据 |
+| init.sh | 是 | 需要更新 | 缺少 Harness 文件存在检查和样本数据验证 |
+| progress.md | 是 | 活跃 | 含决策和下一步的会话日志 |
+| session-handoff.md | 是 | 活跃 | 交接模板已填充 |
+| clean-state-checklist.md | 是 | 完整 | 7 个分类 30+ 项检查 |
+| evaluator-rubric.md | 是 | 完整 | 本文件 |
+| quality-document.md | 是 | 完整 | 与本评分卡关联 |
 
-### Documentation Assessment
+### 文档评估
 
-| File | Present | Quality | Notes |
+| 文件 | 是否存在 | 质量 | 备注 |
 |------|---------|---------|-------|
-| docs/requirements-spec.md | Yes | Complete | Full v5 spec (593 lines) |
-| docs/ARCHITECTURE.md | Yes | Complete | Full layer diagram, data flows, storage layout, protocols |
-| docs/PRODUCT.md | Yes | Complete | All user stories and interaction patterns |
-| docs/RELIABILITY.md | Yes | Complete | Logging, clean state, benchmarking, error handling |
-| docs/harness-development-guide.md | Yes | Complete | Comprehensive harness methodology guide |
-| docs/harness-v2-plan.md | Yes | Complete | Complete redesign plan with design rationale |
+| docs/requirements-spec.md | 是 | 完整 | v5 完整规格（593 行）|
+| docs/ARCHITECTURE.md | 是 | 完整 | 完整层图、数据流、存储布局、协议 |
+| docs/PRODUCT.md | 是 | 完整 | 所有用户故事和交互模式 |
+| docs/RELIABILITY.md | 是 | 完整 | 日志、清理状态、基准测试、错误处理 |
+| docs/harness-development-guide.md | 是 | 完整 | 全面的 Harness 方法论指南 |
+| docs/harness-v2-plan.md | 是 | 完整 | 完整重设计方案含设计理由 |
 
-### Feature Scorecard
+### 功能评分卡
 
-| Feature | Score | Evidence |
+| 功能 | 分数 | 证据 |
 |---------|-------|----------|
-| feat-001: 项目脚手架 | - | Not yet started |
-| feat-002: AI Agent Runtime | - | Not yet started |
-| feat-003: P0 即时演示 | - | Not yet started |
-| feat-004: P1 可视化 | - | Not yet started |
-| feat-005: P2 模拟器 | - | Not yet started |
-| feat-006: 测验闭环 | - | Not yet started |
-| feat-007: 课堂广播 | - | Not yet started |
-| feat-008: 搜索/快照/导出 | - | Not yet started |
-| feat-009: 课纲 RAG | - | Not yet started |
-| feat-010: 性能优化 | - | Not yet started |
+| feat-001: 项目脚手架 | - | 尚未开始 |
+| feat-002: AI Agent 运行时 | - | 尚未开始 |
+| feat-003: P0 即时演示 | - | 尚未开始 |
+| feat-004: P1 可视化 | - | 尚未开始 |
+| feat-005: P2 模拟器 | - | 尚未开始 |
+| feat-006: 测验闭环 | - | 尚未开始 |
+| feat-007: 课堂广播 | - | 尚未开始 |
+| feat-008: 搜索/快照/导出 | - | 尚未开始 |
+| feat-009: 课纲 RAG | - | 尚未开始 |
+| feat-010: 性能优化 | - | 尚未开始 |
 
-### WebSocket Event Coverage
+### WebSocket 事件覆盖率
 
-To be tracked as features are implemented.
+待功能实现后跟踪。
 
-### REST API Coverage
+### REST API 覆盖率
 
-To be tracked as features are implemented.
+待功能实现后跟踪。
 
-### Summary
+### 总结
 
-This is the initial harness setup for DB Demo Studio. All documentation and harness scaffolding is complete, with 15 harness files and 6 documentation files. Development of feat-001 (Project Scaffold & Conversation Infrastructure) is the recommended next step.
+这是 DB Demo Studio 的初始 Harness 设置。所有文档和 Harness 脚手架已完成，共 15 个 Harness 文件和 6 个文档文件。推荐下一步开始 feat-001（项目脚手架与对话基础设施）的开发。
