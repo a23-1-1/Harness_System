@@ -1,5 +1,7 @@
 #!/bin/bash
-set -e
+# init.sh -- Verify the project builds cleanly before starting work.
+# Run this after cloning or when resuming work.
+set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$PROJECT_DIR"
@@ -9,81 +11,103 @@ echo " DB Demo Studio — Environment Initialization"
 echo "============================================"
 echo ""
 
-# ── 后端环境 ──
-echo "[backend] Setting up Python virtual environment..."
-if [ ! -d "backend/venv" ]; then
-    python -m venv backend/venv
-fi
-source backend/venv/bin/activate 2>/dev/null || source backend/venv/Scripts/activate
+# ── 1. Verify harness files ──
+echo "[1/6] Verifying harness files..."
+FILES_OK=true
+for file in AGENTS.md CLAUDE.md feature_list.json progress.md session-handoff.md clean-state-checklist.md evaluator-rubric.md quality-document.md; do
+  if [ ! -f "$file" ]; then
+    echo "  MISSING: $file"
+    FILES_OK=false
+  else
+    echo "  OK: $file"
+  fi
+done
 
-if [ -f backend/requirements.txt ]; then
-    echo "[backend] Installing Python dependencies..."
-    pip install --upgrade pip -q
-    pip install -r backend/requirements.txt -q
+for doc in docs/requirements-spec.md docs/ARCHITECTURE.md docs/PRODUCT.md docs/RELIABILITY.md docs/harness-development-guide.md docs/harness-v2-plan.md; do
+  if [ -f "$doc" ]; then
+    echo "  OK: $doc"
+  fi
+done
+echo ""
+
+# ── 2. Backend environment ──
+echo "[2/6] Setting up backend environment..."
+if [ -d "backend" ]; then
+    if [ ! -d "backend/venv" ]; then
+        python -m venv backend/venv
+    fi
+    source backend/venv/bin/activate 2>/dev/null || source backend/venv/Scripts/activate
+    if [ -f backend/requirements.txt ]; then
+        pip install --upgrade pip -q
+        pip install -r backend/requirements.txt -q
+        echo "  Backend dependencies installed"
+    else
+        echo "  No backend/requirements.txt yet — skipping"
+    fi
 else
-    echo "[backend] No requirements.txt yet — skipping"
+    echo "  No backend/ directory yet — skipping"
 fi
+echo ""
 
-# ── 前端环境 ──
+# ── 3. Frontend environment ──
+echo "[3/6] Setting up frontend environment..."
 if [ -f frontend/package.json ]; then
-    echo "[frontend] Installing Node.js dependencies..."
     cd frontend
     if command -v pnpm &> /dev/null; then
-        pnpm install
+        pnpm install --silent
     elif command -v npm &> /dev/null; then
-        npm install
-    else
-        echo "[frontend] WARNING: No pnpm or npm found"
+        npm install --silent
     fi
+    echo "  Frontend dependencies installed"
     cd "$PROJECT_DIR"
 else
-    echo "[frontend] No frontend/package.json yet — skipping"
+    echo "  No frontend/package.json yet — skipping"
 fi
+echo ""
 
-# ── Docker 数据库 ──
+# ── 4. Docker databases ──
+echo "[4/6] Checking Docker databases..."
 if [ -f docker/docker-compose.yml ]; then
-    echo "[docker] Checking Docker databases..."
     if command -v docker &> /dev/null; then
         docker compose -f docker/docker-compose.yml ps 2>/dev/null || \
-            echo "[docker] Containers not running — start with: docker compose -f docker/docker-compose.yml up -d"
+            echo "  Containers not running — start with: docker compose -f docker/docker-compose.yml up -d"
     else
-        echo "[docker] Docker not available — skip"
+        echo "  Docker not available — skipping"
     fi
-fi
-
-# ── 验证关键依赖 ──
-echo ""
-echo "=== Verification ==="
-
-# Python 后端
-python -c "import fastapi; print(f'[backend] fastapi ✓')" 2>/dev/null || echo "[backend] fastapi ✗"
-python -c "import redis; print(f'[backend] redis ✓')" 2>/dev/null || echo "[backend] redis ✗"
-python -c "import asyncpg; print(f'[backend] asyncpg ✓')" 2>/dev/null || echo "[backend] asyncpg ✗"
-python -c "import anthropic; print(f'[backend] anthropic ✓')" 2>/dev/null || echo "[backend] anthropic ✗"
-python -c "import pytest; print(f'[backend] pytest ✓')" 2>/dev/null || echo "[backend] pytest ✗"
-
-# Node 前端
-if command -v node &> /dev/null; then
-    echo "[frontend] node $(node -v) ✓"
 else
-    echo "[frontend] node ✗"
+    echo "  No docker/docker-compose.yml yet — skipping"
 fi
+echo ""
 
-# Docker
-if command -v docker &> /dev/null; then
-    echo "[docker] docker $(docker -v) ✓"
+# ── 5. Verify key dependencies ──
+echo "[5/6] Verifying key dependencies..."
+python -c "import fastapi; print('  fastapi: OK')" 2>/dev/null || echo "  fastapi: NOT INSTALLED"
+python -c "import redis; print('  redis: OK')" 2>/dev/null || echo "  redis: NOT INSTALLED"
+python -c "import anthropic; print('  anthropic: OK')" 2>/dev/null || echo "  anthropic: NOT INSTALLED"
+python -c "import pytest; print('  pytest: OK')" 2>/dev/null || echo "  pytest: NOT INSTALLED"
+command -v node &> /dev/null && echo "  node $(node -v): OK" || echo "  node: NOT FOUND"
+command -v docker &> /dev/null && echo "  docker: OK" || echo "  docker: NOT FOUND"
+echo ""
+
+# ── 6. Summary ──
+echo "[6/6] Summary..."
+echo ""
+
+if [ "$FILES_OK" = true ]; then
+    echo "============================================"
+    echo " Init complete. All harness files present."
+    echo "============================================"
+    echo ""
+    echo "Quick start:"
+    echo "  Backend:  cd backend && uvicorn app.main:app --reload --port 8000"
+    echo "  Frontend: cd frontend && pnpm dev"
+    echo "  DB:       docker compose -f docker/docker-compose.yml up -d"
+    echo ""
+    echo "Next: read feature_list.json, pick ONE feature, implement it, re-run ./init.sh"
 else
-    echo "[docker] docker ✗"
+    echo "============================================"
+    echo " Init complete with WARNINGS."
+    echo " Some harness files are missing."
+    echo "============================================"
+    exit 1
 fi
-
-echo ""
-echo "============================================"
-echo " Initialization Complete"
-echo "============================================"
-echo ""
-echo "Quick start:"
-echo "  Backend:  cd backend && uvicorn app.main:app --reload --port 8000"
-echo "  Frontend: cd frontend && pnpm dev"
-echo "  DB:       docker compose -f docker/docker-compose.yml up -d"
-echo ""
-echo "Next: read feature_list.json, pick ONE feature, implement it, re-run ./init.sh"
