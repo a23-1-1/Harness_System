@@ -1,0 +1,60 @@
+{
+  "features": [
+    {
+      "id": "feat-001",
+      "name": "项目脚手架",
+      "description": "Streamlit 应用框架搭建，Claude API 集成，基础对话界面，虚拟环境+依赖管理",
+      "dependencies": [],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-002",
+      "name": "数据库概念可视化引擎",
+      "description": "对话触发生成 B+树、哈希索引、ER 图、查询计划等数据库核心概念的动态可视化，支持 graphviz + matplotlib 双引擎",
+      "dependencies": ["feat-001"],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-003",
+      "name": "数据库模拟器对话搭建",
+      "description": "对话式搭建设简化数据库引擎模拟器（B+树增删查、缓冲池管理、查询执行模型），用户可通过自然语言调整模拟参数",
+      "dependencies": ["feat-002"],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-004",
+      "name": "AI 讲解词与课件生成",
+      "description": "Claude API 根据知识点自动生成讲解词、教学大纲、逐页课件内容，支持多轮对话打磨和口吻调整",
+      "dependencies": ["feat-001"],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-005",
+      "name": "测验自动出题与反馈",
+      "description": "根据当前知识点自动生成选择题/判断题/简答题，支持对话难度调整和答题反馈解释",
+      "dependencies": ["feat-004"],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-006",
+      "name": "效果验证与实验报告",
+      "description": "验证生成的演示是否准确，跑 SQL 验证查询结果正确性，输出知识点教学效果实验报告",
+      "dependencies": ["feat-003", "feat-005"],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-007",
+      "name": "对话历史持久化",
+      "description": "每次会话的对话记录、生成的演示、测验结果持久化保存，支持回顾和继续之前的会话",
+      "dependencies": ["feat-006"],
+      "status": "not-started",
+      "evidence": ""
+    }
+  ]
+}
