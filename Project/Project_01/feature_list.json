@@ -2,57 +2,81 @@
   "features": [
     {
       "id": "feat-001",
-      "name": "项目脚手架",
-      "description": "Streamlit 应用框架搭建，Claude API 集成，基础对话界面，虚拟环境+依赖管理",
+      "name": "项目脚手架 & 对话基础设施",
+      "description": "FastAPI + WebSocket + Redis + PostgreSQL 基础框架搭建；React 19 + Vite 8 三栏前端布局；多对话 CRUD（F0.1）；WebSocket 连接/重连/心跳（F0.3）；消息持久化（Redis 缓存 + PG 全量）",
       "dependencies": [],
       "status": "not-started",
       "evidence": ""
     },
     {
       "id": "feat-002",
-      "name": "数据库概念可视化引擎",
-      "description": "对话触发生成 B+树、哈希索引、ER 图、查询计划等数据库核心概念的动态可视化，支持 graphviz + matplotlib 双引擎",
+      "name": "AI Agent Runtime & LLM Gateway",
+      "description": "Orchestrator Agent 编排 + Specialist MCP Agents 工具链；LLM Gateway（Claude Sonnet 4.6 主 + DeepSeek fallback）；Prompt Caching + Structured Output；Agent 执行轨迹推送（agent:thinking 事件）；教师风格 Profile 加载（F0.6）",
       "dependencies": ["feat-001"],
       "status": "not-started",
       "evidence": ""
     },
     {
       "id": "feat-003",
-      "name": "数据库模拟器对话搭建",
-      "description": "对话式搭建设简化数据库引擎模拟器（B+树增删查、缓冲池管理、查询执行模型），用户可通过自然语言调整模拟参数",
+      "name": "P0 即时演示 — 对话式生成 & 6 阶段分步讲解",
+      "description": "对话输入 SQL/知识点 → AI 识别意图 → 生成 6 阶段演示（lex/parse/optimize/plan/execute/result）；流式生成预览（step:preview）+ 用户可打断；对话精修单步（F1.5）；Mermaid 流程图可视化（F2.1）；演示版本快照（F0.5）",
       "dependencies": ["feat-002"],
       "status": "not-started",
       "evidence": ""
     },
     {
       "id": "feat-004",
-      "name": "AI 讲解词与课件生成",
-      "description": "Claude API 根据知识点自动生成讲解词、教学大纲、逐页课件内容，支持多轮对话打磨和口吻调整",
-      "dependencies": ["feat-001"],
+      "name": "P1 轻量可视化 & EXPlAIN 引擎集成",
+      "description": "Mermaid/ASCII/ECharts 对话式生成（F2.1-F2.3）；Docker MySQL 8.0:3308 + PostgreSQL 16:5433 作为 EXPLAIN 引擎；Nested Loop / Hash Join / Sort Merge 分步动画；对话调整样式/颜色/高亮",
+      "dependencies": ["feat-003"],
       "status": "not-started",
       "evidence": ""
     },
     {
       "id": "feat-005",
-      "name": "测验自动出题与反馈",
-      "description": "根据当前知识点自动生成选择题/判断题/简答题，支持对话难度调整和答题反馈解释",
+      "name": "P2 专业模拟器（B+树 / 事务 / SQL 执行）",
+      "description": "对话式构建 B+树模拟器（插入/删除/查找动画）；事务隔离级别模拟器（RR 幻读、锁竞争）；SQL 分步执行模拟器（F3.1-F3.3）；D3.js 动画配置对话生成",
       "dependencies": ["feat-004"],
       "status": "not-started",
       "evidence": ""
     },
     {
       "id": "feat-006",
-      "name": "效果验证与实验报告",
-      "description": "验证生成的演示是否准确，跑 SQL 验证查询结果正确性，输出知识点教学效果实验报告",
-      "dependencies": ["feat-003", "feat-005"],
+      "name": "对话式测验 & 教学闭环",
+      "description": "AI 自动出题（选择题/判断题/简答，F4.1）；学生答题后 AI 讲解错误原因（F4.2）；掌握度分析 + 自适应建议（F4.3-F4.4）；嵌入式测验 UI 联动演示步骤",
+      "dependencies": ["feat-005"],
       "status": "not-started",
       "evidence": ""
     },
     {
       "id": "feat-007",
-      "name": "对话历史持久化",
-      "description": "每次会话的对话记录、生成的演示、测验结果持久化保存，支持回顾和继续之前的会话",
-      "dependencies": ["feat-006"],
+      "name": "课堂广播 & 多端同步",
+      "description": "Redis Pub/Sub 课堂广播（教师讲→学生端同步）；WebSocket Room 管理 + 多设备连接池；演示同步（player:seek → 全班跳转到同一步骤）；课堂成员管理（Room Set）",
+      "dependencies": ["feat-003"],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-008",
+      "name": "对话搜索 / 版本快照 / 导出",
+      "description": "按标题/日期/知识点搜索历史对话（F0.2）；演示版本快照回溯 + 对比（F5.3）；多格式导出（交互网页/MP4/Mermaid/LMS 嵌入，F5.1-F5.2）；基于已有演示复用改编（F5.4）",
+      "dependencies": ["feat-006", "feat-007"],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-009",
+      "name": "课纲 RAG & 教师风格学习",
+      "description": "PostgreSQL pgvector 课纲/教材向量化 RAG；知识点搜索 API；教师风格 Profile 自动学习（对话编辑偏好 → 逐渐个性化响应）；LLM 响应缓存（Redis，目标命中率 > 30%）",
+      "dependencies": ["feat-008"],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-010",
+      "name": "性能优化 & 生产部署",
+      "description": "Redis 缓存策略调优（TTL/淘汰/冷热分离）；PG 分表 + 连接池；速率限制（Redis Sorted Set）；Docker Compose 一键部署；前端体积优化（< 400KB）；AI 审计日志",
+      "dependencies": ["feat-009"],
       "status": "not-started",
       "evidence": ""
     }
