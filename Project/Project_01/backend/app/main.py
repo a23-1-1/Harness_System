@@ -115,6 +115,7 @@ from app.routes import conversations  # noqa: E402
 from app.ws import handlers  # noqa: E402
 
 app.include_router(conversations.router, prefix="/api/v5")
+app.include_router(handlers.router)
 
 
 # ─── 健康检查 ────────────────────────────────────────────────
