@@ -17,52 +17,36 @@ class ConnectionManager:
     """WebSocket 连接管理器"""
 
     def __init__(self):
-        # {conv_id: {websocket: teacher_id}}
         self.active_connections: dict[str, dict[WebSocket, str]] = {}
-        # {websocket: conv_id}
         self.websocket_map: dict[WebSocket, str] = {}
-        self.heartbeat_interval = 30  # 秒
+        self.heartbeat_interval = 30
 
     async def connect(self, websocket: WebSocket, conv_id: str, teacher_id: str):
-        """接受 WebSocket 连接"""
         await websocket.accept()
         if conv_id not in self.active_connections:
             self.active_connections[conv_id] = {}
         self.active_connections[conv_id][websocket] = teacher_id
         self.websocket_map[websocket] = conv_id
-        # 更新 Redis 会话缓存
-        await redis_cache.set_session(conv_id, {
-            "teacherId": teacher_id,
-            "wsActive": True,
-        })
-        logger.info(
-            f"WebSocket 连接: conv={conv_id}, teacher={teacher_id}",
-            extra={"data": {"convId": conv_id, "teacherId": teacher_id, "action": "connect"}},
-        )
+        await redis_cache.set_session(conv_id, {"teacherId": teacher_id, "wsActive": True})
+        logger.info(f"WebSocket connect: conv={conv_id}, teacher={teacher_id}")
 
     async def disconnect(self, websocket: WebSocket):
-        """断开 WebSocket 连接"""
         conv_id = self.websocket_map.pop(websocket, None)
         if conv_id and conv_id in self.active_connections:
             self.active_connections[conv_id].pop(websocket, None)
             if not self.active_connections[conv_id]:
                 del self.active_connections[conv_id]
                 await redis_cache.delete_session(conv_id)
-        logger.info(
-            f"WebSocket 断开: conv={conv_id}",
-            extra={"data": {"convId": conv_id, "action": "disconnect"}},
-        )
+        logger.info(f"WebSocket disconnect: conv={conv_id}")
 
     async def send_personal(self, websocket: WebSocket, event: str, payload: dict):
-        """向指定客户端发送消息"""
         message = json.dumps({"event": event, "payload": payload}, ensure_ascii=False)
         try:
             await websocket.send_text(message)
         except Exception as e:
-            logger.error(f"发送消息失败: {e}", extra={"data": {"event": event}})
+            logger.error(f"send failed: {e}")
 
     async def broadcast(self, conv_id: str, event: str, payload: dict, exclude: Optional[WebSocket] = None):
-        """向对话中的所有客户端广播消息"""
         if conv_id not in self.active_connections:
             return
         message = json.dumps({"event": event, "payload": payload}, ensure_ascii=False)
@@ -72,10 +56,9 @@ class ConnectionManager:
             try:
                 await ws.send_text(message)
             except Exception as e:
-                logger.error(f"广播失败: {e}", extra={"data": {"convId": conv_id, "event": event}})
+                logger.error(f"broadcast failed: {e}")
 
     async def handle_messages(self, websocket: WebSocket, conv_id: str):
-        """处理来自客户端的消息（主循环）"""
         heartbeat_task = asyncio.create_task(self._heartbeat(websocket))
         try:
             while True:
@@ -83,43 +66,24 @@ class ConnectionManager:
                 data = json.loads(raw)
                 event = data.get("event", "")
                 payload = data.get("payload", {})
-
-                logger.info(
-                    f"收到事件: {event}",
-                    extra={"data": {"event": event, "convId": conv_id}},
-                )
-
-                # 路由事件到对应的处理器
                 if event == "chat:message":
-                    await self._handle_chat_message(websocket, conv_id, payload)
+                    from app.agents.orchestrator import orchestrator
+                    await orchestrator.process_message(websocket, self, conv_id, payload)
                 elif event == "chat:interrupt":
-                    await self._handle_interrupt(websocket, conv_id)
+                    await self.send_personal(websocket, "agent:thinking", {"step": "interrupted", "message": "已中断"})
                 elif event == "ping":
                     await self.send_personal(websocket, "pong", {"timestamp": payload.get("timestamp", "")})
                 else:
-                    logger.warning(f"未知事件: {event}")
+                    logger.warning(f"unknown event: {event}")
         except WebSocketDisconnect:
             pass
         except Exception as e:
-            logger.error(f"消息处理异常: {e}")
+            logger.error(f"handle error: {e}")
         finally:
             heartbeat_task.cancel()
             await self.disconnect(websocket)
 
-    async def _handle_chat_message(self, websocket: WebSocket, conv_id: str, payload: dict):
-        """处理 chat:message 事件 → 交由 Orchestrator Agent 处理"""
-        from app.agents.orchestrator import orchestrator
-        await orchestrator.process_message(websocket, self, conv_id, payload)
-
-    async def _handle_interrupt(self, websocket: WebSocket, conv_id: str):
-        """处理 chat:interrupt 事件"""
-        await self.send_personal(websocket, "agent:thinking", {
-            "step": "interrupted",
-            "message": "已中断",
-        })
-
     async def _heartbeat(self, websocket: WebSocket):
-        """心跳检测"""
         try:
             while True:
                 await asyncio.sleep(self.heartbeat_interval)
@@ -128,3 +92,7 @@ class ConnectionManager:
             pass
         except Exception:
             pass
+
+
+# 全局单例
+ws_manager = ConnectionManager()

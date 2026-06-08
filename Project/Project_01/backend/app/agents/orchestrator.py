@@ -33,6 +33,19 @@ class OrchestratorAgent:
 
         # 1. 保存用户消息到 PostgreSQL + 更新计数器
         async with async_session_factory() as db:
+            # 确保对话存在
+            result = await db.execute(select(Conversation).where(Conversation.id == conv_id))
+            conv = result.scalar_one_or_none()
+            if not conv:
+                # 自动创建不存在的对话
+                conv = Conversation(
+                    id=conv_id,
+                    teacher_id="default",
+                    title=f"对话 {conv_id[:8]}",
+                )
+                db.add(conv)
+                await db.flush()
+
             msg = Message(
                 conv_id=conv_id,
                 role="user",

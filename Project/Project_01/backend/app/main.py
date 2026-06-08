@@ -18,7 +18,7 @@ env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 if env_path.exists():
     load_dotenv(env_path)
 
-from app.ws.manager import ConnectionManager
+from app.ws.manager import ConnectionManager, ws_manager
 from app.database import init_db
 from app.redis_cache import redis_cache
 
