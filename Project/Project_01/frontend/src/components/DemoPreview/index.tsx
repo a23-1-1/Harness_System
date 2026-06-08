@@ -5,6 +5,7 @@ import {
   Sparkles,
   CheckCircle2,
   ChevronRight,
+  PanelRightOpen,
 } from "lucide-react";
 import type { DemoComplete } from "../../types";
 
@@ -29,73 +30,76 @@ const SIX_STAGES = [
   { i: 6, key: "result", label: "结果分析" },
 ];
 
-export default function DemoPreview({ demo }: Props) {
-  const [activeTab, setActiveTab] = useState<Tab>("flow");
-  const [activeStage, setActiveStage] = useState(1);
+/* ─── 空状态（无演示时） ─── */
+function EmptyState() {
+  return (
+    <div className="flex flex-col h-full">
+      {/* Tab 栏占位 */}
+      <div className="border-b border-slate-200/60 bg-slate-50/80 backdrop-blur-sm p-2 flex items-center gap-1.5 rounded-t-2xl">
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          return (
+            <span
+              key={t.key}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 text-slate-300 cursor-default"
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {t.label}
+            </span>
+          );
+        })}
+      </div>
 
-  /* ─── 空状态（无演示时） ─── */
-  if (!demo) {
-    return (
-      <div className="flex flex-col h-full">
-        {/* 空 Tab 栏占位 */}
-        <div className="border-b border-slate-100 bg-slate-50/50 p-2 rounded-t-2xl flex items-center gap-1">
-          {TABS.map((t) => {
-            const Icon = t.icon;
-            return (
-              <span
-                key={t.key}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 text-slate-300 cursor-default"
-              >
-                <Icon className="w-3.5 h-3.5" />
-                {t.label}
-              </span>
-            );
-          })}
-        </div>
-
-        {/* 网格背景 + 空状态 */}
-        <div className="flex-1 flex items-center justify-center bg-[#fafbfd]"
-          style={{
-            backgroundImage: `
-              linear-gradient(90deg, rgba(148,163,184,0.04) 1px, transparent 1px),
-              linear-gradient(0deg, rgba(148,163,184,0.04) 1px, transparent 1px)
-            `,
-            backgroundSize: "20px 20px",
-          }}>
-          <div className="flex flex-col items-center gap-3 px-8 text-center">
-            {/* 虚线边框容器 */}
-            <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center">
-              <Layers className="w-8 h-8 text-slate-300" />
-            </div>
-            <p className="text-sm font-medium text-slate-300">
-              等待演示内容
-            </p>
-            <p className="text-xs text-slate-300/70 leading-relaxed max-w-[200px]">
-              在中间对话区输入 SQL 或知识点，AI 生成的演示将在此处展示
-            </p>
+      {/* 网格主画布 */}
+      <div className="flex-1 bg-grid-pattern flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 px-8 text-center">
+          <div className="border border-dashed border-slate-300 p-4 rounded-xl">
+            <PanelRightOpen className="w-8 h-8 text-slate-300" />
           </div>
+          <p className="text-sm font-medium text-slate-400">
+            等待演示内容
+          </p>
+          <p className="text-xs text-slate-300/70 leading-relaxed max-w-[200px]">
+            在中间对话区输入 SQL 或知识点
+            <br />
+            AI 生成的演示将在此处展示
+          </p>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
-  /* ─── 有演示数据 ─── */
+/* ─── 有演示数据 ─── */
+function ActiveView({
+  demo,
+  activeTab,
+  activeStage,
+  onTabChange,
+  onStageClick,
+}: {
+  demo: DemoComplete;
+  activeTab: Tab;
+  activeStage: number;
+  onTabChange: (t: Tab) => void;
+  onStageClick: (i: number) => void;
+}) {
   return (
     <div className="flex flex-col h-full">
       {/* 顶部 Tab 导航 */}
-      <div className="border-b border-slate-100 bg-slate-50/50 p-2 rounded-t-2xl flex items-center gap-1">
+      <div className="border-b border-slate-200/60 bg-slate-50/80 backdrop-blur-sm p-2 flex items-center gap-1.5 rounded-t-2xl">
         {TABS.map((t) => {
           const Icon = t.icon;
           const isActive = activeTab === t.key;
           return (
             <button
               key={t.key}
-              onClick={() => setActiveTab(t.key)}
-              className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all duration-150
+              onClick={() => onTabChange(t.key)}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3.5 py-1.5 rounded-lg transition-all duration-150
                 ${
                   isActive
-                    ? "bg-white text-slate-900 shadow-sm border border-slate-200/40"
-                    : "text-slate-400 hover:text-slate-600"
+                    ? "bg-white text-slate-800 shadow-sm border border-slate-200/60"
+                    : "text-slate-400 hover:text-slate-600 px-3 py-1.5"
                 }`}
             >
               <Icon className="w-3.5 h-3.5" />
@@ -122,23 +126,10 @@ export default function DemoPreview({ demo }: Props) {
         </div>
       </div>
 
-      {/* 带网格背景的主画布 */}
-      <div
-        className="flex-1 overflow-y-auto bg-[#fafbfd]"
-        style={{
-          backgroundImage: `
-            linear-gradient(90deg, rgba(148,163,184,0.04) 1px, transparent 1px),
-            linear-gradient(0deg, rgba(148,163,184,0.04) 1px, transparent 1px)
-          `,
-          backgroundSize: "20px 20px",
-        }}
-      >
+      {/* 网格主画布 */}
+      <div className="flex-1 overflow-y-auto bg-grid-pattern">
         {activeTab === "flow" && (
-          <FlowEditor
-            demo={demo}
-            activeStage={activeStage}
-            onStageClick={setActiveStage}
-          />
+          <FlowEditor demo={demo} activeStage={activeStage} onStageClick={onStageClick} />
         )}
         {activeTab === "execution" && (
           <ExecutionPlayer demo={demo} activeStage={activeStage} />
@@ -147,7 +138,7 @@ export default function DemoPreview({ demo }: Props) {
       </div>
 
       {/* 底部状态 */}
-      <div className="px-4 py-2.5 border-t border-slate-100 bg-white flex items-center justify-between">
+      <div className="px-4 py-2.5 border-t border-slate-200/60 bg-white flex items-center justify-between">
         <div className="flex items-center gap-2 text-[10px] text-slate-400">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
           {demo.steps.length} 个步骤 · 演示就绪
@@ -155,6 +146,24 @@ export default function DemoPreview({ demo }: Props) {
         <span className="text-[10px] font-mono text-slate-300">v1.0</span>
       </div>
     </div>
+  );
+}
+
+/* ─── 根组件 ─── */
+export default function DemoPreview({ demo }: Props) {
+  const [activeTab, setActiveTab] = useState<Tab>("flow");
+  const [activeStage, setActiveStage] = useState(1);
+
+  if (!demo) return <EmptyState />;
+
+  return (
+    <ActiveView
+      demo={demo}
+      activeTab={activeTab}
+      activeStage={activeStage}
+      onTabChange={setActiveTab}
+      onStageClick={setActiveStage}
+    />
   );
 }
 
@@ -175,7 +184,6 @@ function FlowEditor({
       {/* 六阶段进度条 */}
       <div className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm">
         <div className="relative">
-          {/* 连接线 */}
           <div className="absolute top-3 left-4 right-4 h-0.5 bg-slate-100" />
           <div className="flex justify-between relative">
             {SIX_STAGES.map((s) => (
@@ -224,7 +232,6 @@ function FlowEditor({
             }`}
         >
           <div className="flex items-start gap-3">
-            {/* 编号 */}
             <span
               className={`flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold flex-shrink-0 transition-colors
                 ${
@@ -276,9 +283,7 @@ function ExecutionPlayer({
         <div className="bg-white rounded-xl border border-slate-100 p-3 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
             <span className="w-2 h-2 rounded-full bg-blue-500" />
-            <span className="text-[11px] font-semibold text-slate-700">
-              会话 A
-            </span>
+            <span className="text-[11px] font-semibold text-slate-700">会话 A</span>
           </div>
           <div className="space-y-1.5 font-mono text-[11px] leading-relaxed">
             <p className="text-emerald-600 font-medium">BEGIN;</p>
@@ -289,9 +294,7 @@ function ExecutionPlayer({
         <div className="bg-white rounded-xl border border-slate-100 p-3 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
             <span className="w-2 h-2 rounded-full bg-purple-500" />
-            <span className="text-[11px] font-semibold text-slate-700">
-              会话 B
-            </span>
+            <span className="text-[11px] font-semibold text-slate-700">会话 B</span>
           </div>
           <div className="space-y-1.5 font-mono text-[11px] leading-relaxed">
             <p className="text-emerald-600 font-medium">BEGIN;</p>
@@ -304,9 +307,7 @@ function ExecutionPlayer({
       {/* 时间线滑块 */}
       <div className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-[11px] font-semibold text-slate-500">
-            操作时间线
-          </span>
+          <span className="text-[11px] font-semibold text-slate-500">操作时间线</span>
           <span className="text-[10px] text-slate-400 font-mono">
             T{activeStage}/{demo.steps.length}
           </span>
@@ -343,7 +344,6 @@ function AnimationEngine() {
   return (
     <div className="p-4">
       <div className="bg-white rounded-xl border border-slate-100 p-8 flex flex-col items-center gap-4 shadow-sm">
-        {/* 旋转动画环 */}
         <div className="relative w-20 h-20">
           <div className="absolute inset-0 rounded-full border-2 border-slate-100" />
           <Sparkles className="absolute inset-0 m-auto w-8 h-8 text-slate-300 animate-pulse" />
