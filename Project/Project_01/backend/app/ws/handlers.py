@@ -3,8 +3,8 @@ DB Demo Studio — WebSocket 事件处理器
 
 注册 WebSocket 路由，处理连接 / 断连 / 消息循环。
 """
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
-from app.main import ws_manager
+from fastapi import APIRouter, WebSocket, Query
+from app.ws.manager import ws_manager
 
 router = APIRouter()
 
