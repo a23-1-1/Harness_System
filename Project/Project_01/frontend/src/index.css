@@ -2,10 +2,12 @@
 
 :root {
   --color-primary: #3b82f6;
-  --color-bg: #f8fafc;
+  --color-primary-hover: #2563eb;
+  --color-bg: #f1f5f9;
   --color-surface: #ffffff;
+  --color-sidebar: #f8fafc;
   --color-border: #e2e8f0;
-  --color-text: #1e293b;
+  --color-text: #0f172a;
   --color-text-secondary: #64748b;
 }
 
@@ -21,4 +23,19 @@ html, body, #root {
     "Helvetica Neue", Arial, "Noto Sans SC", sans-serif;
   background: var(--color-bg);
   color: var(--color-text);
+}
+
+/* 自定义滚动条（轻量 IDE 风格） */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }

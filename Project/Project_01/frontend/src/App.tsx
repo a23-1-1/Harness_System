@@ -28,21 +28,23 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-slate-100 p-3 gap-3">
       {/* 左栏：对话列表 */}
       <div className="w-72 flex-shrink-0">
-        <ConversationPanel
-          conversations={conversations}
-          activeId={activeConv}
-          onSelect={setActiveConv}
-          onCreate={handleCreateConv}
-          onDelete={remove}
-          onRename={rename}
-        />
+        <div className="h-full bg-white rounded-xl shadow-sm overflow-hidden">
+          <ConversationPanel
+            conversations={conversations}
+            activeId={activeConv}
+            onSelect={setActiveConv}
+            onCreate={handleCreateConv}
+            onDelete={remove}
+            onRename={rename}
+          />
+        </div>
       </div>
 
       {/* 中栏：聊天面板 */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 bg-white rounded-xl shadow-sm overflow-hidden">
         <ChatPanel
           messages={wsMessages}
           onSend={handleSend}
@@ -52,7 +54,7 @@ export default function App() {
       </div>
 
       {/* 右栏：演示预览 */}
-      <div className="w-96 flex-shrink-0 border-l border-gray-200">
+      <div className="w-96 flex-shrink-0 bg-white rounded-xl shadow-sm overflow-hidden">
         <DemoPreview demo={lastDemo} />
       </div>
     </div>
