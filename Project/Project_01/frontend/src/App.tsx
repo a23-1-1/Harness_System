@@ -15,7 +15,6 @@ export default function App() {
   const { conversations, create, remove, rename } = useConversations();
   const [lastDemo, setLastDemo] = useState<DemoComplete | null>(null);
 
-  // 监听 WS 提取最新演示完成事件
   const latestDemoMsg = [...wsMessages]
     .reverse()
     .find((m) => m.event === "demo:complete");
@@ -31,11 +30,15 @@ export default function App() {
     setActiveConv(conv.id);
   };
 
+  const panelClass =
+    "h-full bg-white rounded-2xl border border-slate-200/60 overflow-hidden flex flex-col " +
+    "shadow-[0_1px_3px_rgba(0,0,0,0.02),0_12px_24px_-4px_rgba(0,0,0,0.04)]";
+
   return (
-    <div className="flex h-screen bg-[#0f1117] p-2 gap-2 select-none">
+    <div className="h-[calc(100vh-2.5rem)] flex p-5 gap-5 bg-[#f8fafc]">
       {/* 左栏：对话列表 */}
       <div className="w-64 flex-shrink-0">
-        <div className="h-full bg-[#1a1b26] rounded-xl border border-[#292e42] overflow-hidden flex flex-col">
+        <div className={panelClass}>
           <ConversationPanel
             conversations={conversations}
             activeId={activeConv}
@@ -49,7 +52,7 @@ export default function App() {
 
       {/* 中栏：核心对话工作区 */}
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="flex-1 bg-[#1a1b26] rounded-xl border border-[#292e42] overflow-hidden flex flex-col">
+        <div className={panelClass}>
           <ChatPanel
             messages={wsMessages}
             onSend={handleSend}
@@ -61,7 +64,7 @@ export default function App() {
 
       {/* 右栏：动态演示预览 */}
       <div className="w-[420px] flex-shrink-0">
-        <div className="h-full bg-[#1a1b26] rounded-xl border border-[#292e42] overflow-hidden flex flex-col">
+        <div className={panelClass}>
           <DemoPreview demo={lastDemo} />
         </div>
       </div>

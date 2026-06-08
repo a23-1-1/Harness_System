@@ -1,40 +1,35 @@
 @import "tailwindcss";
 
 :root {
-  /* 核心暗色系 */
-  --color-bg: #0f1117;
-  --color-surface: #1a1b26;
-  --color-surface-hover: #1e1f2b;
-  --color-surface-active: #24253b;
-  --color-border: #292e42;
-  --color-border-light: #333952;
+  /* 核心浅色高级 SaaS 色板 */
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f8f9fc;
+  --color-surface-active: #eef0f5;
+  --color-border: #e4e7ed;
+  --color-border-light: #ebeef5;
 
   /* 文字 */
-  --color-text: #c0caf5;
-  --color-text-secondary: #565f89;
-  --color-text-muted: #3b4261;
+  --color-text: #1e2029;
+  --color-text-secondary: #6b7280;
+  --color-text-muted: #9ca3af;
 
-  /* 霓虹点缀 */
-  --color-accent: #7aa2f7;
-  --color-accent-hover: #89b4fa;
-  --color-accent-glow: rgba(122, 162, 247, 0.15);
-  --color-green: #9ece6a;
-  --color-green-dim: rgba(158, 206, 106, 0.15);
-  --color-amber: #e0af68;
-  --color-amber-dim: rgba(224, 175, 104, 0.15);
-  --color-red: #f7768e;
-  --color-red-dim: rgba(247, 118, 142, 0.15);
-  --color-cyan: #7dcfff;
-  --color-purple: #bb9af7;
+  /* 主色调（蓝） */
+  --color-accent: #3b82f6;
+  --color-accent-hover: #2563eb;
+  --color-accent-glow: rgba(59, 130, 246, 0.1);
+  --color-green: #22c55e;
+  --color-green-dim: rgba(34, 197, 94, 0.1);
+  --color-amber: #eab308;
+  --color-amber-dim: rgba(234, 179, 8, 0.1);
+  --color-red: #ef4444;
+  --color-red-dim: rgba(239, 68, 68, 0.1);
+  --color-cyan: #06b6d4;
+  --color-purple: #8b5cf6;
 
   /* 代码 */
-  --color-code-bg: #0d0e14;
-  --color-code-text: #a9b1d6;
-  --color-code-keyword: #bb9af7;
-  --color-code-string: #9ece6a;
-  --color-code-number: #ff9e64;
-  --color-code-comment: #565f89;
-  --color-code-function: #7aa2f7;
+  --color-code-bg: #f8f9fc;
+  --color-code-text: #374151;
 }
 
 * {
@@ -45,49 +40,88 @@
 
 html, body, #root {
   height: 100%;
-  font-family: "JetBrains Mono", "Cascadia Code", "Fira Code", "Consolas",
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Noto Sans SC", "Microsoft YaHei", sans-serif;
   background: var(--color-bg);
   color: var(--color-text);
   font-size: 13px;
   line-height: 1.6;
 }
 
-/* 暗色滚动条 */
-::-webkit-scrollbar {
-  width: 5px;
+/* ──────────────────────────────────────────────
+ * 高级浅色工程网格背景
+ * 适合作为页面的装饰性底板纹理
+ * ────────────────────────────────────────────── */
+.bg-grid-pattern {
+  background-image:
+    linear-gradient(
+      90deg,
+      rgba(148, 163, 184, 0.03) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      0deg,
+      rgba(148, 163, 184, 0.03) 1px,
+      transparent 1px
+    );
+  background-size: 20px 20px;
 }
+
+/* ──────────────────────────────────────────────
+ * 柔和脉冲动画
+ * 比 Tailwind 默认 pulse 更低调的高级替代
+ * ────────────────────────────────────────────── */
+@keyframes soft-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.animate-soft-pulse {
+  animation: soft-pulse 2s ease-in-out infinite;
+}
+
+/* ──────────────────────────────────────────────
+ * 全局滚动条美化（WebKit 内核）
+ * 极淡灰色，圆角，悬浮加深
+ * ────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: #292e42;
+  background: #cbd5e1;   /* slate-300 */
   border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #3b4261;
+  transition: background 0.15s ease;
 }
 
-/* 选中色 */
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;   /* slate-400 */
+}
+
+/* ──────────────────────────────────────────────
+ * 选中色
+ * ────────────────────────────────────────────── */
 ::selection {
   background: var(--color-accent-glow);
   color: var(--color-text);
 }
 
-/* 输入框通用样式 */
+/* ──────────────────────────────────────────────
+ * 输入框通用样式
+ * ────────────────────────────────────────────── */
 input, textarea, select {
   font-family: inherit;
 }
+
 input::placeholder, textarea::placeholder {
   color: var(--color-text-muted);
-}
-
-/* 毛玻璃效果 */
-.glass {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-.glass-subtle {
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
 }

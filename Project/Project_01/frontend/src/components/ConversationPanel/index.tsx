@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Search, Plus, Trash2, MessageSquare, Sparkles } from "lucide-react";
 import type { Conversation } from "../types";
 
 interface Props {
@@ -10,19 +11,33 @@ interface Props {
   onRename: (id: string, title: string) => void;
 }
 
-const CATEGORIES: { key: Conversation["status"] | "all"; label: string; icon: string }[] = [
-  { key: "all", label: "全部", icon: "⊡" },
-  { key: "active", label: "进行中", icon: "●" },
-  { key: "draft", label: "草稿", icon: "◐" },
-  { key: "finalized", label: "已定稿", icon: "✓" },
-  { key: "archived", label: "归档", icon: "⊟" },
+/** 分类过滤器定义 */
+const CATEGORIES: { key: Conversation["status"] | "all"; label: string }[] = [
+  { key: "all", label: "全部" },
+  { key: "active", label: "进行中" },
+  { key: "draft", label: "草稿" },
+  { key: "finalized", label: "已定稿" },
+  { key: "archived", label: "归档" },
 ];
 
-const STATUS_COLOR: Record<string, string> = {
-  active: "text-[#9ece6a]",
-  draft: "text-[#e0af68]",
-  finalized: "text-[#7dcfff]",
-  archived: "text-[#565f89]",
+/** 状态对应的 Badge 样式 */
+const STATUS_BADGE: Record<string, { label: string; className: string }> = {
+  active: {
+    label: "进行中",
+    className: "bg-green-50 text-green-700 border border-green-200/60",
+  },
+  draft: {
+    label: "草稿",
+    className: "bg-amber-50 text-amber-700 border border-amber-200/60",
+  },
+  finalized: {
+    label: "已定稿",
+    className: "bg-emerald-50 text-emerald-700 border border-emerald-200/60",
+  },
+  archived: {
+    label: "归档",
+    className: "bg-slate-50 text-slate-500 border border-slate-200/60",
+  },
 };
 
 export default function ConversationPanel({
@@ -69,83 +84,92 @@ export default function ConversationPanel({
   };
 
   return (
-    <>
-      {/* 顶栏：搜索 + 新建 */}
-      <div className="px-3 pt-3 pb-2 space-y-2">
+    <div className="flex flex-col h-full">
+      {/* ─── 顶部操作区 ─── */}
+      <div className="px-4 pt-4 pb-2 space-y-3">
+        {/* 搜索框 */}
         <div className="relative">
-          <svg
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#565f89]"
-            fill="none" stroke="currentColor" viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <input
             type="text"
             placeholder="搜索演示项目…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-xs bg-[#0f1117] border border-[#292e42] rounded-lg
-                       placeholder:text-[#3b4261] text-[#c0caf5]
-                       focus:outline-none focus:border-[#7aa2f7]/50 focus:ring-1 focus:ring-[#7aa2f7]/20
-                       transition-all duration-200"
+            className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50/80 border border-slate-200
+                       rounded-xl placeholder:text-slate-400 text-slate-700
+                       transition-all duration-200
+                       focus:outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
           />
         </div>
 
+        {/* 新建按钮 */}
         <button
           onClick={handleCreate}
-          className="w-full flex items-center justify-center gap-2 py-2 text-xs font-semibold
-                     text-[#7aa2f7] bg-[#7aa2f7]/10 border border-[#7aa2f7]/20 rounded-lg
-                     hover:bg-[#7aa2f7]/20 hover:border-[#7aa2f7]/40
-                     active:scale-[0.98] transition-all duration-150"
+          className="w-full flex items-center justify-center gap-2 py-2.5
+                     bg-slate-900 text-white font-medium text-sm
+                     rounded-xl shadow-sm
+                     hover:bg-slate-800 active:scale-[0.98]
+                     transition-all duration-150"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-          </svg>
-          + 新建演示对话
+          <Plus className="w-4 h-4" />
+          新建演示对话
         </button>
       </div>
 
-      {/* 分类标签 */}
-      <div className="flex gap-1 px-3 pb-2 overflow-x-auto">
+      {/* ─── 分类标签 ─── */}
+      <div className="flex gap-1.5 px-4 pb-3 overflow-x-auto border-b border-slate-100">
         {CATEGORIES.map((cat) => (
           <button
             key={cat.key}
             onClick={() => setFilter(cat.key)}
-            className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md whitespace-nowrap transition-all duration-150
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-all duration-150
               ${filter === cat.key
-                ? "bg-[#7aa2f7]/15 text-[#7aa2f7] border border-[#7aa2f7]/30"
-                : "text-[#565f89] border border-transparent hover:text-[#c0caf5] hover:bg-[#1e1f2b]"}`}
+                ? "bg-slate-900 text-white shadow-sm"
+                : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"}`}
           >
-            <span className="text-[9px]">{cat.icon}</span>
             {cat.label}
           </button>
         ))}
       </div>
 
-      {/* 分组列表 */}
-      <div className="flex-1 overflow-y-auto px-2 pb-2">
+      {/* ─── 对话列表 ─── */}
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-[10px] text-[#3b4261] gap-2">
-            <span className="text-2xl opacity-40">☕</span>
-            {search || filter !== "all" ? "没有匹配的对话" : "新建一个演示对话开始吧"}
+          <div className="flex flex-col items-center justify-center h-full text-center gap-3 py-12">
+            <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
+              <MessageSquare className="w-6 h-6 text-slate-300" />
+            </div>
+            <p className="text-sm text-slate-400">
+              {search || filter !== "all" ? "没有匹配的对话" : "暂无对话"}
+            </p>
+            {!search && filter === "all" && (
+              <button
+                onClick={handleCreate}
+                className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                创建第一个演示对话
+              </button>
+            )}
           </div>
         ) : filter === "all" ? (
-          /* 分组视图 */
+          /* ─── 分组视图（全部标签下） ─── */
           (["active", "draft", "finalized", "archived"] as const).map((status) => {
             const items = grouped[status];
             if (!items?.length) return null;
             return (
-              <div key={status} className="mb-1">
-                <div className="flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold text-[#565f89] uppercase tracking-wider">
-                  <span className={`text-[9px] ${STATUS_COLOR[status]}`}>
-                    {CATEGORIES.find((c) => c.key === status)?.icon}
+              <div key={status} className="mb-2">
+                {/* 组标题 */}
+                <div className="flex items-center gap-2 px-1 py-1.5">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
+                    {CATEGORIES.find((c) => c.key === status)?.label}
                   </span>
-                  {CATEGORIES.find((c) => c.key === status)?.label}
-                  <span className="ml-auto text-[#3b4261]">{items.length}</span>
+                  <span className="text-[10px] text-slate-300 font-mono">
+                    {items.length}
+                  </span>
                 </div>
                 {items.map((c) => (
-                  <ConversationItem
+                  <ConversationCard
                     key={c.id}
                     conversation={c}
                     active={activeId === c.id}
@@ -162,8 +186,9 @@ export default function ConversationPanel({
             );
           })
         ) : (
+          /* ─── 单分类扁平视图 ─── */
           filtered.map((c) => (
-            <ConversationItem
+            <ConversationCard
               key={c.id}
               conversation={c}
               active={activeId === c.id}
@@ -178,12 +203,14 @@ export default function ConversationPanel({
           ))
         )}
       </div>
-    </>
+    </div>
   );
 }
 
-/* ───── 对话卡片子组件 ───── */
-function ConversationItem({
+/* ──────────────────────────────────────────────
+ * ConversationCard — 对话卡片子组件
+ * ────────────────────────────────────────────── */
+function ConversationCard({
   conversation: c,
   active,
   editing,
@@ -204,22 +231,23 @@ function ConversationItem({
   onConfirmRename: () => void;
   onDelete: () => void;
 }) {
+  const badge = STATUS_BADGE[c.status] || STATUS_BADGE.active;
+
   return (
     <div
       onClick={onSelect}
-      className={`group relative mx-1 mb-0.5 px-3 py-2 rounded-lg cursor-pointer border transition-all duration-150
+      className={`group relative p-4 mb-2 rounded-xl border cursor-pointer transition-all duration-150
         ${active
-          ? "bg-[#7aa2f7]/8 border-[#7aa2f7]/30"
-          : "border-transparent hover:bg-[#1e1f2b] hover:border-[#292e42]"}`}
+          ? "bg-blue-50/40 border-blue-100"
+          : "bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/60"}`}
     >
-      <div className="flex items-start gap-2">
-        {/* 状态色点 */}
-        <span className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0
-          ${c.status === "active" ? "bg-[#9ece6a] shadow-[0_0_6px_#9ece6a]" : ""}
-          ${c.status === "draft" ? "bg-[#e0af68]" : ""}
-          ${c.status === "finalized" ? "bg-[#7dcfff]" : ""}
-          ${c.status === "archived" ? "bg-[#3b4261]" : ""}`}
-        />
+      {/* 激活状态左侧指示条 */}
+      {active && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-full bg-blue-600" />
+      )}
+
+      <div className="flex items-start justify-between gap-3 pl-1">
+        {/* 文本区 */}
         <div className="flex-1 min-w-0">
           {editing ? (
             <input
@@ -228,41 +256,55 @@ function ConversationItem({
               onChange={(e) => onChangeEditTitle(e.target.value)}
               onBlur={onConfirmRename}
               onKeyDown={(e) => e.key === "Enter" && onConfirmRename()}
-              className="w-full px-1 py-0.5 text-xs bg-[#0f1117] border border-[#7aa2f7]/50 rounded text-[#c0caf5] outline-none"
+              className="w-full px-2 py-1 text-sm bg-white border border-blue-400 rounded-lg text-slate-800 outline-none ring-2 ring-blue-400/20"
               autoFocus
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
             <p
               onDoubleClick={onStartRename}
-              className={`text-xs truncate leading-tight ${active ? "text-[#c0caf5] font-medium" : "text-[#a9b1d6]"}`}
+              className={`text-sm tracking-tight truncate ${
+                active ? "text-slate-800 font-semibold" : "text-slate-800 font-semibold"
+              }`}
             >
               {c.title}
             </p>
           )}
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-[10px] text-[#565f89]">
-              {c.message_count} 轮 · {c.snapshot_count} 演示
+
+          {/* 元信息 */}
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="text-xs text-slate-400 font-normal">
+              {c.message_count} 轮 · {c.snapshot_count} 个演示
             </span>
             {c.tags?.slice(0, 2).map((t) => (
-              <span key={t} className="text-[9px] px-1 py-0.5 rounded bg-[#292e42] text-[#7aa2f7]/80 font-mono">
+              <span
+                key={t}
+                className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 font-mono"
+              >
                 #{t}
               </span>
             ))}
           </div>
         </div>
 
-        {/* 删除按钮 */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="hidden group-hover:flex items-center justify-center w-5 h-5 rounded
-                     text-[#565f89] hover:text-[#f7768e] hover:bg-[#f7768e]/10 transition-colors"
-        >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
+        {/* 右侧操作区 */}
+        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+          {/* 状态 Badge */}
+          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-md ${badge.className}`}>
+            {badge.label}
+          </span>
+
+          {/* 删除按钮 */}
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="flex items-center justify-center w-7 h-7 rounded-lg
+                       text-slate-300 opacity-0 group-hover:opacity-100
+                       hover:text-red-500 hover:bg-red-50
+                       transition-all duration-150"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
     </div>
   );
