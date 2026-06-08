@@ -107,51 +107,9 @@ class ConnectionManager:
             await self.disconnect(websocket)
 
     async def _handle_chat_message(self, websocket: WebSocket, conv_id: str, payload: dict):
-        """处理 chat:message 事件，保存消息到 PostgreSQL"""
-        from app.database import async_session_factory
-        from app.models.conversation import Message
-
-        msg_type = payload.get("type", "text")
-        content = payload.get("content", "")
-
-        # 保存用户消息到 PostgreSQL
-        async with async_session_factory() as db:
-            msg = Message(
-                conv_id=conv_id,
-                role="user",
-                type=msg_type,
-                content={"text": content} if msg_type == "text" else payload,
-            )
-            db.add(msg)
-            await db.commit()
-            logger.info(
-                "消息已持久化",
-                extra={"data": {"convId": conv_id, "msgId": msg.id, "type": msg_type}},
-            )
-
-        # 先回显消息确认
-        await self.send_personal(websocket, "step:preview", {
-            "stepIndex": 0,
-            "content": f"收到消息: {content[:50]}...",
-            "type": msg_type,
-        })
-
-        # TODO: feat-002 实现后，这里会调用 AI Agent Runtime
-        # 暂时返回模拟响应
-        await self.send_personal(websocket, "agent:thinking", {
-            "step": "analyze",
-            "message": "正在分析您的输入...",
-        })
-        await asyncio.sleep(0.5)
-        await self.send_personal(websocket, "demo:complete", {
-            "demoId": f"demo_{conv_id}",
-            "title": f"演示: {content[:30]}",
-            "steps": [
-                {"index": 1, "title": "词法分析", "content": f"解析输入: {content}"},
-                {"index": 2, "title": "语法解析", "content": "构建语法树..."},
-                {"index": 3, "title": "演示就绪", "content": "AI 协作式演示等待进一步开发。"},
-            ],
-        })
+        """处理 chat:message 事件 → 交由 Orchestrator Agent 处理"""
+        from app.agents.orchestrator import orchestrator
+        await orchestrator.process_message(websocket, self, conv_id, payload)
 
     async def _handle_interrupt(self, websocket: WebSocket, conv_id: str):
         """处理 chat:interrupt 事件"""

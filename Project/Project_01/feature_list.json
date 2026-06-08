@@ -5,15 +5,15 @@
       "name": "项目脚手架 & 对话基础设施",
       "description": "FastAPI + WebSocket + Redis + PostgreSQL 基础框架搭建；React 19 + Vite 8 三栏前端布局；多对话 CRUD（F0.1）；WebSocket 连接/重连/心跳（F0.3）；消息持久化（Redis 缓存 + PG 全量）",
       "dependencies": [],
-      "status": "not-started",
-      "evidence": ""
+      "status": "done",
+      "evidence": "FastAPI 骨架启动正常（port 8000），WebSocket 连接/心跳/重连完整，PostgreSQL 持久化 3 张表自动创建，Redis 会话缓存集成，React 19 三栏布局本地开发运行正常（port 5173），Docker Compose PG+Redis 双容器健康"
     },
     {
       "id": "feat-002",
       "name": "AI Agent Runtime & LLM Gateway",
-      "description": "Orchestrator Agent 编排 + Specialist MCP Agents 工具链；LLM Gateway（Claude Sonnet 4.6 主 + DeepSeek fallback）；Prompt Caching + Structured Output；Agent 执行轨迹推送（agent:thinking 事件）；教师风格 Profile 加载（F0.6）",
+      "description": "Orchestrator Agent 编排 + LLM Gateway（OpenAI/SiliconFlow 兼容 DeepSeek API）；Prompt Caching + Structured Output；Agent 执行轨迹推送（agent:thinking 事件）；教师风格 Profile 加载（F0.6）",
       "dependencies": ["feat-001"],
-      "status": "not-started",
+      "status": "in-progress",
       "evidence": ""
     },
     {
