@@ -100,9 +100,27 @@ class ConnectionManager:
             await self.disconnect(websocket)
 
     async def _handle_chat_message(self, websocket: WebSocket, conv_id: str, payload: dict):
-        """处理 chat:message 事件"""
+        """处理 chat:message 事件，保存消息到 PostgreSQL"""
+        from app.database import async_session_factory
+        from app.models.conversation import Message
+
         msg_type = payload.get("type", "text")
         content = payload.get("content", "")
+
+        # 保存用户消息到 PostgreSQL
+        async with async_session_factory() as db:
+            msg = Message(
+                conv_id=conv_id,
+                role="user",
+                type=msg_type,
+                content={"text": content} if msg_type == "text" else payload,
+            )
+            db.add(msg)
+            await db.commit()
+            logger.info(
+                "消息已持久化",
+                extra={"data": {"convId": conv_id, "msgId": msg.id, "type": msg_type}},
+            )
 
         # 先回显消息确认
         await self.send_personal(websocket, "step:preview", {

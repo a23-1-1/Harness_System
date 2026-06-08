@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
 from app.ws.manager import ConnectionManager
+from app.database import init_db
 
 load_dotenv()
 
@@ -49,9 +50,13 @@ ws_manager = ConnectionManager()
 async def lifespan(app: FastAPI):
     """应用启动/关闭生命周期"""
     logger.info("🚀 DB Demo Studio 启动", extra={"data": {"status": "starting"}})
-    # 启动时检查 Redis / PG 连接（可在此添加健康检查预热）
+    # 自动创建数据库表（开发环境）
+    try:
+        await init_db()
+        logger.info("数据库表初始化完成")
+    except Exception as e:
+        logger.warning(f"数据库初始化失败（若未启动 Docker 可忽略）: {e}")
     yield
-    # 关闭时清理
     logger.info("🛑 DB Demo Studio 关闭", extra={"data": {"status": "stopping"}})
 
 

@@ -16,6 +16,10 @@
 - [x] Git 仓库初始化，采用单 `master` 主分支，模块通过目录区分
 - [x] Agent harness 创建 & 定制化（基于 requirements-spec.md v5 优化）
 - [x] 明确完整技术栈（React 19 + FastAPI + WebSocket + Redis + PG + Docker）
+- [x] backend/ 和 frontend/ 完整骨架代码（23 个文件，1046 行）
+- [x] 对话 CRUD 从内存存储迁移到 PostgreSQL 持久化（SQLAlchemy async）
+- [x] 数据模型定义（Conversation / Message / Demo 三张表）
+- [x] WebSocket 消息写入 PostgreSQL 持久化
 
 ### What's In Progress
 
@@ -25,11 +29,13 @@
 
 ### What's Next
 
-1. 创建项目目录结构（frontend/, backend/, docker/, mcp-servers/）
-2. 创建 backend FastAPI 骨架 + WebSocket Manager
-3. 创建 frontend React 三栏布局（ConversationPanel + ChatPanel + DemoPreview）
-4. Docker Compose 配置 MySQL 8.0 + PostgreSQL 16
-5. 多对话 CRUD 接口 + 消息持久化
+1. ✅ 创建项目目录结构（frontend/, backend/, docker/, mcp-servers/）
+2. ✅ 创建 backend FastAPI 骨架 + WebSocket Manager
+3. ✅ 创建 frontend React 三栏布局（ConversationPanel + ChatPanel + DemoPreview）
+4. ✅ PostgreSQL 持久化替换内存存储
+5. ✅ WebSocket 消息写入 PG
+6. [ ] Docker Compose 启动数据库验证
+7. [ ] Redis 会话缓存集成
 
 ## Blockers / Risks
 
