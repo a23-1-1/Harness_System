@@ -6,11 +6,17 @@ import json
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
+
+# 加载 .env（从项目根目录，兼容 uvicorn 不同启动路径）
+env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
 
 from app.ws.manager import ConnectionManager
 from app.database import init_db
