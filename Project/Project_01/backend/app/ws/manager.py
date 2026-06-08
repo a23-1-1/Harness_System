@@ -19,6 +19,9 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: dict[str, dict[WebSocket, str]] = {}
         self.websocket_map: dict[WebSocket, str] = {}
+        # per-conv 正在运行的 process_message 任务，用于精确打断
+        self._active_tasks: dict[str, asyncio.Task] = {}
+        self._send_locks: dict[WebSocket, asyncio.Lock] = {}
         self.heartbeat_interval = 30
 
     async def connect(self, websocket: WebSocket, conv_id: str, teacher_id: str):
@@ -32,6 +35,7 @@ class ConnectionManager:
 
     async def disconnect(self, websocket: WebSocket):
         conv_id = self.websocket_map.pop(websocket, None)
+        self._send_locks.pop(websocket, None)  # 清理发送锁
         if conv_id and conv_id in self.active_connections:
             self.active_connections[conv_id].pop(websocket, None)
             if not self.active_connections[conv_id]:
@@ -40,6 +44,7 @@ class ConnectionManager:
         logger.info(f"WebSocket disconnect: conv={conv_id}")
 
     async def send_personal(self, websocket: WebSocket, event: str, payload: dict):
+        """向指定客户端发送消息（asyncio 单线程，无需额外锁）"""
         message = json.dumps({"event": event, "payload": payload}, ensure_ascii=False)
         try:
             await websocket.send_text(message)
@@ -59,6 +64,7 @@ class ConnectionManager:
                 logger.error(f"broadcast failed: {e}")
 
     async def handle_messages(self, websocket: WebSocket, conv_id: str):
+        """消息处理循环——所有长时间运行的任务均通过 create_task 异步执行，不阻塞消息接收。"""
         heartbeat_task = asyncio.create_task(self._heartbeat(websocket))
         try:
             while True:
@@ -66,21 +72,45 @@ class ConnectionManager:
                 data = json.loads(raw)
                 event = data.get("event", "")
                 payload = data.get("payload", {})
+
                 if event == "chat:message":
                     from app.agents.orchestrator import orchestrator
-                    await orchestrator.process_message(websocket, self, conv_id, payload)
+                    # 取消同一 conv 之前的未完成任务（精确打断，无需轮询）
+                    prev = self._active_tasks.get(conv_id)
+                    if prev and not prev.done():
+                        prev.cancel()
+                    task = asyncio.create_task(
+                        orchestrator.process_message(websocket, self, conv_id, payload)
+                    )
+                    self._active_tasks[conv_id] = task
+                    task.add_done_callback(lambda t: self._active_tasks.pop(conv_id, None))
+
                 elif event == "chat:interrupt":
-                    await self.send_personal(websocket, "agent:thinking", {"step": "interrupted", "message": "已中断"})
+                    from app.agents.orchestrator import orchestrator
+                    # 只设置 interrupt flag，不 cancel 任务——让 checkpoint 优雅退出
+                    orchestrator.interrupt(conv_id)
+
+                elif event == "step:regenerate":
+                    from app.agents.orchestrator import orchestrator
+                    task = asyncio.create_task(
+                        orchestrator.regenerate_step(websocket, self, conv_id, payload)
+                    )
+
                 elif event == "ping":
                     await self.send_personal(websocket, "pong", {"timestamp": payload.get("timestamp", "")})
+
                 else:
                     logger.warning(f"unknown event: {event}")
+
         except WebSocketDisconnect:
             pass
         except Exception as e:
             logger.error(f"handle error: {e}")
         finally:
             heartbeat_task.cancel()
+            prev = self._active_tasks.pop(conv_id, None)
+            if prev and not prev.done():
+                prev.cancel()
             await self.disconnect(websocket)
 
     async def _heartbeat(self, websocket: WebSocket):

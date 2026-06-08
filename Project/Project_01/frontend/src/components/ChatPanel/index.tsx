@@ -55,6 +55,12 @@ const EVENT_META: Record<
     border: "border-blue-100",
     text: "text-blue-700",
   },
+  "step:regenerated": {
+    label: "步骤已重写",
+    bg: "bg-amber-50",
+    border: "border-amber-200",
+    text: "text-amber-700",
+  },
   "agent:thinking": {
     label: "工具调度",
     bg: "bg-blue-50",
@@ -112,7 +118,7 @@ export default function ChatPanel({
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_42%,#eef6ff_100%)]">
-      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-8 py-5 backdrop-blur">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/20">
             <Bot className="h-5 w-5" />
@@ -149,7 +155,7 @@ export default function ChatPanel({
         </div>
       </div>
 
-      <div className="scroll-area min-h-0 flex-1 overflow-y-auto px-6 pb-56 pt-6">
+      <div className="scroll-area min-h-0 flex-1 overflow-y-auto px-10 pb-52 pt-8">
         {messages.length === 0 ? (
           <WelcomeView
             onQuickSelect={setInput}
@@ -168,24 +174,23 @@ export default function ChatPanel({
 
       <form
         onSubmit={handleSubmit}
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-5 pb-5"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center bg-gradient-to-t from-[#f8fafc] via-[#f8fafc]/95 to-transparent px-10 pb-7 pt-16"
       >
-        <div className="pointer-events-auto mx-auto max-w-4xl rounded-[1.75rem] border border-slate-200/90 bg-white/95 p-3 shadow-[0_24px_70px_rgba(15,23,42,0.18)] backdrop-blur-xl transition focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-100">
+        <div className="pointer-events-auto w-full max-w-[820px] overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.16)] transition focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-100">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="输入 SQL、知识点或教学目标，例如：用动画解释 Hash Join 为什么适合大表等值连接"
-            disabled={!connected}
             rows={3}
-            className="max-h-48 min-h-24 w-full resize-none bg-transparent px-4 py-3 text-base leading-relaxed text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-40"
+            className="block max-h-40 min-h-24 w-full resize-none bg-white px-6 py-4 text-base leading-7 text-slate-800 outline-none placeholder:text-slate-400"
           />
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-2 pt-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 px-5 py-3">
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={insertSqlTemplate}
-                className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3.5 py-2 text-sm font-medium text-slate-600 transition hover:bg-blue-50 hover:text-blue-700"
+                className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-sm font-medium text-slate-600 ring-1 ring-slate-200 transition hover:bg-blue-50 hover:text-blue-700 hover:ring-blue-200"
               >
                 <Code2 className="h-4 w-4" />
                 SQL 模板
@@ -197,7 +202,7 @@ export default function ChatPanel({
                     "请把当前演示改成适合 10 分钟课堂讲解的版本，增加提问点和关键总结。",
                   )
                 }
-                className="rounded-full bg-slate-100 px-3.5 py-2 text-sm font-medium text-slate-600 transition hover:bg-violet-50 hover:text-violet-700"
+                className="rounded-full bg-white px-3.5 py-2 text-sm font-medium text-slate-600 ring-1 ring-slate-200 transition hover:bg-violet-50 hover:text-violet-700 hover:ring-violet-200"
               >
                 优化讲稿
               </button>
@@ -206,8 +211,9 @@ export default function ChatPanel({
               type="submit"
               disabled={!connected || !input.trim()}
               className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+              title={!connected ? "实时通道未连接，暂时无法发送" : "发送消息"}
             >
-              生成演示
+              {connected ? "生成演示" : "未连接"}
               <SendHorizonal className="h-4 w-4" />
             </button>
           </div>
@@ -227,45 +233,36 @@ function WelcomeView({
   hasActiveConversation: boolean;
 }) {
   return (
-    <div className="flex min-h-full flex-col justify-center px-2 py-6">
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="rounded-[2rem] border border-blue-100 bg-gradient-to-br from-white to-blue-50 p-7 shadow-xl shadow-blue-100/40">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="absolute inset-0 scale-150 rounded-full bg-blue-200/50 blur-xl" />
-                <div className="relative rounded-2xl bg-blue-600 p-4 text-white shadow-lg shadow-blue-600/25">
-                  <Database className="h-7 w-7" />
-                </div>
-              </div>
-              <div>
-                <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
-                  先选一个教学任务
-                </h1>
-                <p className="mt-2 text-base leading-relaxed text-slate-500">
-                  选择模板后可以继续修改提示词，再生成完整演示。
-                </p>
-              </div>
-            </div>
-            {!hasActiveConversation && (
-              <button
-                onClick={() => onCreateConversation()}
-                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:bg-blue-700"
-              >
-                新建并保存对话
-              </button>
-            )}
+    <div className="flex min-h-full items-center justify-center px-10 py-10">
+      <div className="w-full max-w-4xl">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
+            <Database className="h-7 w-7" />
           </div>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-slate-950">
+            先选一个教学任务
+          </h1>
+          <p className="mx-auto mt-2 max-w-xl text-base leading-relaxed text-slate-500">
+            选择模板后可以继续修改提示词，或直接在下方输入 SQL 和知识点生成演示。
+          </p>
+          {!hasActiveConversation && (
+            <button
+              onClick={() => onCreateConversation()}
+              className="mt-5 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:bg-blue-700"
+            >
+              新建并保存对话
+            </button>
+          )}
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
           {QUICK_CARDS.map((card) => (
             <button
               key={card.title}
               onClick={() => onQuickSelect(card.prompt)}
-              className="group flex min-h-44 flex-col items-start rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100"
+              className="group flex min-h-44 flex-col items-start rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100/80"
             >
-              <span className="rounded-xl bg-slate-950 px-2.5 py-1.5 font-mono text-[11px] font-semibold text-white">
+              <span className="rounded-full bg-blue-50 px-3 py-1.5 font-mono text-xs font-bold text-blue-700 ring-1 ring-blue-100">
                 {card.icon}
               </span>
               <span className="mt-4 text-base font-semibold text-slate-900 group-hover:text-blue-700">
@@ -363,9 +360,11 @@ function MessageBubble({ msg }: { msg: WsMessage }) {
         >
           {msg.event === "demo:complete" && payload.steps ? (
             <DemoCompleteMessage payload={payload as DemoPayload} />
+          ) : (msg.event === "step:preview" || msg.event === "step:regenerated") && payload.title ? (
+            <StepPreviewMessage event={msg.event} payload={payload as Record<string, unknown>} />
           ) : (
             <pre className="whitespace-pre-wrap font-sans text-slate-800">
-              {JSON.stringify(payload, null, 2)}
+              {content || JSON.stringify(payload, null, 2)}
             </pre>
           )}
         </div>
@@ -402,7 +401,38 @@ function DemoCompleteMessage({ payload }: { payload: DemoPayload }) {
   );
 }
 
+function StepPreviewMessage({ event, payload }: { event: string; payload: Record<string, unknown> }) {
+  const title = payload.title as string;
+  const content = payload.content as string;
+  const stage = payload.stage as string;
+  const stageLabel = payload.stageLabel as string;
+  const isRegenerated = event === "step:regenerated";
+
+  const stageBadge = stageLabel
+    ? stageLabel
+    : stage
+      ? stage
+      : "";
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <p className={`text-sm font-semibold ${isRegenerated ? "text-amber-800" : "text-blue-800"}`}>
+          {isRegenerated ? "🔄 " : ""}
+          {title}
+        </p>
+        {stageBadge && (
+          <span className="rounded-full border border-blue-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-blue-600">
+            {stageBadge}
+          </span>
+        )}
+      </div>
+      <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{content}</p>
+    </div>
+  );
+}
+
 type DemoPayload = {
   title?: string;
-  steps?: { index: number; title: string; content: string }[];
+  steps?: { index: number; title: string; content: string; stage?: string }[];
 };

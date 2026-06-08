@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Boxes,
   CheckCircle2,
@@ -9,6 +9,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Play,
+  RefreshCw,
   Route,
   Sparkles,
 } from "lucide-react";
@@ -27,7 +28,8 @@ const TABS: { key: Tab; label: string; icon: typeof Layers }[] = [
   { key: "assets", label: "素材", icon: Boxes },
 ];
 
-const STAGE_LABELS = ["理解输入", "构造步骤", "生成画面", "同步讲解"];
+const STAGE_LABELS = ["词法分析", "语法解析", "查询优化", "执行计划", "执行过程", "结果分析"];
+const STAGE_KEYS = ["lex", "parse", "optimize", "plan", "execute", "result"];
 
 export default function DemoPreview({ demo, onCollapse }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("flow");
@@ -51,7 +53,7 @@ export default function DemoPreview({ demo, onCollapse }: Props) {
 
   return (
     <div className="flex h-full flex-col bg-white text-slate-900">
-      <div className="border-b border-slate-200 bg-gradient-to-br from-blue-50 to-slate-50 p-3">
+      <div className="border-b border-slate-200 bg-gradient-to-br from-blue-50 to-slate-50 px-6 py-5">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
@@ -92,7 +94,7 @@ export default function DemoPreview({ demo, onCollapse }: Props) {
         </div>
       </div>
 
-      <div className="border-b border-slate-200 bg-white p-5">
+      <div className="border-b border-slate-200 bg-white px-7 py-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-600">
@@ -139,7 +141,7 @@ export default function DemoPreview({ demo, onCollapse }: Props) {
         {activeTab === "assets" && <AssetsView stepCount={demo.steps.length} />}
       </div>
 
-      <div className="border-t border-slate-200 bg-white p-4">
+      <div className="border-t border-slate-200 bg-white px-6 py-4">
         <div className="flex items-center justify-between gap-3">
           <button
             onClick={goPrev}
@@ -182,7 +184,7 @@ export default function DemoPreview({ demo, onCollapse }: Props) {
 function EmptyState({ onCollapse }: { onCollapse?: () => void }) {
   return (
     <div className="flex h-full flex-col bg-white text-slate-900">
-      <div className="border-b border-slate-200 bg-gradient-to-br from-blue-50 to-slate-50 p-3">
+      <div className="border-b border-slate-200 bg-gradient-to-br from-blue-50 to-slate-50 px-6 py-5">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
@@ -217,7 +219,7 @@ function EmptyState({ onCollapse }: { onCollapse?: () => void }) {
         </div>
       </div>
 
-      <div className="flex flex-1 items-center justify-center bg-slate-50 p-8">
+      <div className="flex flex-1 items-center justify-center bg-slate-50 px-12 py-10">
         <div className="max-w-xs text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white">
             <PanelRightOpen className="h-8 w-8 text-slate-500" />
@@ -252,15 +254,19 @@ function FlowView({
   onSelect: (index: number) => void;
 }) {
   return (
-    <div className="space-y-3 p-4">
+    <div className="space-y-3 px-6 py-5">
       {steps.map((step, index) => {
         const active = index === activeIndex;
         const done = index < activeIndex;
+        const stage = step.stage || "";
+        const stageColor = STAGE_KEYS.includes(stage)
+          ? "bg-blue-100 text-blue-700 border-blue-200"
+          : "bg-slate-100 text-slate-600 border-slate-200";
         return (
           <button
             key={step.index}
             onClick={() => onSelect(index)}
-            className={`group flex w-full gap-3 rounded-lg border p-4 text-left transition ${
+            className={`group flex w-full gap-4 rounded-2xl border p-4 text-left transition ${
               active
                 ? "border-blue-200 bg-blue-50 shadow-sm"
                 : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/40"
@@ -278,7 +284,14 @@ function FlowView({
               {done ? <CheckCircle2 className="h-4 w-4" /> : step.index}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-slate-900">{step.title}</span>
+              <span className="flex items-center gap-2">
+                <span className="block text-sm font-semibold text-slate-900">{step.title}</span>
+                {stage && (
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${stageColor}`}>
+                    {stage}
+                  </span>
+                )}
+              </span>
               <span className="mt-1 line-clamp-2 block text-xs leading-relaxed text-slate-500">
                 {step.content}
               </span>
@@ -300,45 +313,46 @@ function PlayView({
   activeIndex: number;
   total: number;
 }) {
-  const codeLines = useMemo(
-    () => [
-      "BEGIN;",
-      "EXPLAIN ANALYZE SELECT ...;",
-      "-- visualize operator / lock / index state",
-      "COMMIT;",
-    ],
-    [],
-  );
-
   return (
-    <div className="space-y-4 p-4">
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="space-y-4 px-6 py-5">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
             <Film className="h-3.5 w-3.5" />
             播放帧 {activeIndex + 1}/{total}
           </span>
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+          {step?.stage && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 ring-1 ring-violet-200">
+              {STAGE_LABELS[STAGE_KEYS.indexOf(step.stage)] || step.stage}
+            </span>
+          )}
         </div>
         <h3 className="mt-4 text-lg font-semibold">{step?.title || "暂无步骤"}</h3>
         <p className="mt-2 text-sm leading-relaxed text-slate-600">
           {step?.content || "生成演示后会显示当前播放帧的讲解内容。"}
         </p>
+        {step?.interactive_hint && (
+          <p className="mt-3 text-xs font-medium text-blue-600">
+            💡 {step.interactive_hint}
+          </p>
+        )}
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-700">执行片段</span>
-          <span className="font-mono text-[10px] text-slate-500">SQL Runtime</span>
+          <span className="text-xs font-semibold text-slate-700">步骤信息</span>
+          <span className="font-mono text-[10px] text-slate-500">{step?.stage || "N/A"}</span>
         </div>
-        <div className="space-y-2 font-mono text-xs">
-          {codeLines.map((line, index) => (
-            <p key={line} className={index === activeIndex % 4 ? "text-blue-700" : "text-slate-500"}>
-              <span className="mr-3 text-slate-300">{index + 1}</span>
-              {line}
-            </p>
-          ))}
-        </div>
+        {step?.stage && (
+          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
+            {step.stage === "lex" && "词法分析阶段：数据库引擎将 SQL 文本拆解成 token 序列，识别关键字、标识符、运算符等语法元素。"}
+            {step.stage === "parse" && "语法解析阶段：根据 SQL 语法规则构建语法树，检查语句合法性，确定表名、列名的引用关系。"}
+            {step.stage === "optimize" && "查询优化阶段：优化器分析多种执行策略的代价，选择最优的执行路径。"}
+            {step.stage === "plan" && "执行计划阶段：生成最终的算子执行计划树，每个算子有明确的输入输出和代价估算。"}
+            {step.stage === "execute" && "执行阶段：存储引擎按照计划逐算子执行，扫描数据页、应用过滤条件、返回结果行。"}
+            {step.stage === "result" && "结果分析阶段：收集执行结果，对比估计与实际的差异，总结查询执行的关键问题。"}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -353,14 +367,14 @@ function AssetsView({ stepCount }: { stepCount: number }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 p-4">
+    <div className="grid grid-cols-2 gap-3 px-6 py-5">
       {assets.map((asset) => (
-        <div key={asset.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div key={asset.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-[11px] text-slate-500">{asset.label}</p>
           <p className="mt-2 text-lg font-semibold text-slate-900">{asset.value}</p>
         </div>
       ))}
-      <div className="col-span-2 rounded-xl border border-blue-200 bg-blue-50 p-4">
+      <div className="col-span-2 rounded-2xl border border-blue-200 bg-blue-50 p-5">
         <div className="flex items-center gap-2 text-sm font-semibold text-blue-700">
           <Sparkles className="h-4 w-4" />
           演示资源已准备

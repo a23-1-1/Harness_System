@@ -23,6 +23,8 @@ interface DemoStep {
   index: number;
   title: string;
   content: string;
+  stage?: string;
+  interactive_hint?: string;
 }
 
 interface DemoComplete {

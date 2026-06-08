@@ -30,22 +30,48 @@ DEEPSEEK_MODEL = os.getenv("LLM_MODEL", "deepseek-chat")
 
 # 系统 Prompt
 SYSTEM_PROMPT = """你是一个数据库课程教学助手——DB Demo Studio 的 AI 核心。
-你的任务是根据用户输入的 SQL 或数据库知识点，生成结构化的教学演示。
+你的任务是根据用户输入的 SQL 或数据库知识点，生成结构化的 P0 教学演示。
+
+## 输出格式
 
 请始终以 JSON 格式输出：
+
+```json
 {
+  "title": "演示标题（概括知识点，简练）",
   "steps": [
     {
       "index": 1,
-      "title": "步骤标题",
-      "content": "步骤详细讲解内容"
+      "stage": "lex",
+      "title": "词法分析",
+      "content": "详细的步骤讲解内容，使用教学性语言，包含关键概念解释。",
+      "interactive_hint": "点击关键字可查看含义"
     }
   ]
 }
+```
 
-步骤数量根据知识点的复杂度决定（3-6 步）。
-如果用户输入的是 SQL 查询，请覆盖：词法分析 → 语法解析 → 查询优化 → 执行计划 → 执行过程 → 结果分析。
-如果用户输入的是数据库概念（如 B+树、事务），请按教学逻辑分步讲解。
+## P0 标准 6 阶段
+
+当用户输入 SQL 查询时，请严格按以下 6 个阶段生成：
+
+| 阶段 | 显示名称 | 讲解方向 |
+|------|---------|---------|
+| lex | 词法分析 | 识别 SQL 中的关键字、表名、列名、条件；解释每个关键字含义 |
+| parse | 语法解析 | 展示语法树结构，说明表间关系（JOIN 类型）、过滤条件位置 |
+| optimize | 查询优化 | 展示优化器可选的扫描策略（全表扫描/索引扫描），解释为什么选当前策略 |
+| plan | 执行计划 | 展示最终执行计划树，说明每个算子的作用和代价估算 |
+| execute | 执行过程 | 模拟逐步执行过程，展示中间结果行数变化、缓冲区使用 |
+| result | 结果分析 | 展示最终结果集，总结教学要点 |
+
+当用户输入数据库概念（非 SQL）时，按知识点教学逻辑分 3-6 步讲解，每步的 stage 使用教学阶段名称（如 concept、example、summary 等）。
+
+## 教学风格要求
+
+- 语言通俗易懂，多用类比和比喻
+- 重要概念优先解释
+- 每步内容长度 80-200 字，有实质性讲解
+- 使用中文输出
 """
 
 
@@ -133,6 +159,23 @@ class LLMGateway:
                     {"index": 3, "title": "降级响应", "content": f"请检查 API Key 配置是否正确（当前 Provider: {LLM_PROVIDER}）。"},
                 ]
             }
+
+    async def chat_with_json(self, prompt: str) -> str:
+        """对话接口，强制 JSON 输出（用于步骤重写等子任务）"""
+        messages = [{"role": "user", "content": prompt}]
+        try:
+            client = self._get_client()
+            response = await client.chat.completions.create(
+                model=self._get_model(),
+                messages=messages,
+                temperature=0.7,
+                max_tokens=2048,
+                response_format={"type": "json_object"},
+            )
+            return response.choices[0].message.content or "{}"
+        except Exception as e:
+            logger.error(f"chat_with_json() 调用失败: {e}")
+            return "{}"
 
     async def chat(self, messages: list[dict]) -> str:
         """通用对话接口（用于后续 Agent 对话）"""

@@ -13,16 +13,16 @@
       "name": "AI Agent Runtime & LLM Gateway",
       "description": "Orchestrator Agent 编排 + LLM Gateway（OpenAI/SiliconFlow 兼容 DeepSeek API）；Prompt Caching + Structured Output；Agent 执行轨迹推送（agent:thinking 事件）；教师风格 Profile 加载（F0.6）",
       "dependencies": ["feat-001"],
-      "status": "in-progress",
-      "evidence": ""
+      "status": "done",
+      "evidence": "LLM Gateway (gateway.py) 完整支持双 Provider DeepSeek/SiliconFlow；Redis LLM 缓存（1h TTL）集成；Orchestrator Agent 编排完整流程（保存消息→意图识别→LLM 调用→step:preview 流式推送→demo:complete）；agent:thinking 事件推送；教师 Profile 加载"
     },
     {
       "id": "feat-003",
       "name": "P0 即时演示 — 对话式生成 & 6 阶段分步讲解",
       "description": "对话输入 SQL/知识点 → AI 识别意图 → 生成 6 阶段演示（lex/parse/optimize/plan/execute/result）；流式生成预览（step:preview）+ 用户可打断；对话精修单步（F1.5）；Mermaid 流程图可视化（F2.1）；演示版本快照（F0.5）",
       "dependencies": ["feat-002"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "in-progress",
+      "evidence": "LLM System Prompt 升级为 P0 6 阶段标准结构（lex/parse/optimize/plan/execute/result）；Orchestrator Agent 支持 step:regenerate 局部重写 + chat:interrupt 打断；demo_snapshot 持久化到 PostgreSQL 的 messages 表和 demos 表；WebSocket manager 增加 step:regenerate 路由+interrupt flag；前端 DemoPreview 增加 6 阶段标识牌+阶段说明；ChatPanel 增加 StepPreviewMessage 组件+step:regenerated 显示"
     },
     {
       "id": "feat-004",
