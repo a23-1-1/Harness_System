@@ -8,6 +8,7 @@ import logging
 import asyncio
 from typing import Optional
 from fastapi import WebSocket, WebSocketDisconnect
+from app.redis_cache import redis_cache
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,11 @@ class ConnectionManager:
             self.active_connections[conv_id] = {}
         self.active_connections[conv_id][websocket] = teacher_id
         self.websocket_map[websocket] = conv_id
+        # 更新 Redis 会话缓存
+        await redis_cache.set_session(conv_id, {
+            "teacherId": teacher_id,
+            "wsActive": True,
+        })
         logger.info(
             f"WebSocket 连接: conv={conv_id}, teacher={teacher_id}",
             extra={"data": {"convId": conv_id, "teacherId": teacher_id, "action": "connect"}},
@@ -41,6 +47,7 @@ class ConnectionManager:
             self.active_connections[conv_id].pop(websocket, None)
             if not self.active_connections[conv_id]:
                 del self.active_connections[conv_id]
+                await redis_cache.delete_session(conv_id)
         logger.info(
             f"WebSocket 断开: conv={conv_id}",
             extra={"data": {"convId": conv_id, "action": "disconnect"}},

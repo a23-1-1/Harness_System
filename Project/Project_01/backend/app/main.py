@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 
 from app.ws.manager import ConnectionManager
 from app.database import init_db
+from app.redis_cache import redis_cache
 
 load_dotenv()
 
@@ -56,7 +57,13 @@ async def lifespan(app: FastAPI):
         logger.info("数据库表初始化完成")
     except Exception as e:
         logger.warning(f"数据库初始化失败（若未启动 Docker 可忽略）: {e}")
+    # Redis 连接预热
+    try:
+        await redis_cache.get_client()
+    except Exception as e:
+        logger.warning(f"Redis 连接失败（若未启动 Docker 可忽略）: {e}")
     yield
+    await redis_cache.close()
     logger.info("🛑 DB Demo Studio 关闭", extra={"data": {"status": "stopping"}})
 
 
@@ -108,9 +115,17 @@ app.include_router(conversations.router, prefix="/api/v5")
 @app.get("/api/v5/health")
 async def health_check():
     """健康检查端点"""
+    redis_ok = "unknown"
+    try:
+        client = await redis_cache.get_client()
+        await client.ping()
+        redis_ok = "connected"
+    except Exception:
+        redis_ok = "disconnected"
     return {
         "status": "ok",
         "service": "db-demo-studio",
         "version": "0.1.0",
+        "redis": redis_ok,
         "timestamp": datetime.now(tz=timezone.utc).isoformat(),
     }
