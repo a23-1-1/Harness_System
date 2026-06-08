@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Search, Plus, Trash2, MessageSquare, Sparkles } from "lucide-react";
+import { Search, Plus, Trash2, MessageSquare, Sparkles, ChevronRight } from "lucide-react";
 import type { Conversation } from "../types";
 
 interface Props {
@@ -11,7 +11,6 @@ interface Props {
   onRename: (id: string, title: string) => void;
 }
 
-/** 分类过滤器定义 */
 const CATEGORIES: { key: Conversation["status"] | "all"; label: string }[] = [
   { key: "all", label: "全部" },
   { key: "active", label: "进行中" },
@@ -20,23 +19,22 @@ const CATEGORIES: { key: Conversation["status"] | "all"; label: string }[] = [
   { key: "archived", label: "归档" },
 ];
 
-/** 状态对应的 Badge 样式 */
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   active: {
     label: "进行中",
-    className: "bg-green-50 text-green-700 border border-green-200/60",
+    className: "bg-emerald-50 text-emerald-700 border border-emerald-200/50",
   },
   draft: {
     label: "草稿",
-    className: "bg-amber-50 text-amber-700 border border-amber-200/60",
+    className: "bg-amber-50 text-amber-700 border border-amber-200/50",
   },
   finalized: {
     label: "已定稿",
-    className: "bg-emerald-50 text-emerald-700 border border-emerald-200/60",
+    className: "bg-blue-50 text-blue-700 border border-blue-200/50",
   },
   archived: {
     label: "归档",
-    className: "bg-slate-50 text-slate-500 border border-slate-200/60",
+    className: "bg-slate-50 text-slate-500 border border-slate-200/50",
   },
 };
 
@@ -84,10 +82,9 @@ export default function ConversationPanel({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-[#f8fafc] border-r border-slate-200/60">
       {/* ─── 顶部操作区 ─── */}
       <div className="px-4 pt-4 pb-2 space-y-3">
-        {/* 搜索框 */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <input
@@ -95,18 +92,17 @@ export default function ConversationPanel({
             placeholder="搜索演示项目…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50/80 border border-slate-200
+            className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-200/70
                        rounded-xl placeholder:text-slate-400 text-slate-700
                        transition-all duration-200
-                       focus:outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+                       focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/15"
           />
         </div>
 
-        {/* 新建按钮 */}
         <button
           onClick={handleCreate}
           className="w-full flex items-center justify-center gap-2 py-2.5
-                     bg-slate-900 text-white font-medium text-sm
+                     bg-slate-900 text-white font-medium text-xs tracking-wide
                      rounded-xl shadow-sm
                      hover:bg-slate-800 active:scale-[0.98]
                      transition-all duration-150"
@@ -117,7 +113,7 @@ export default function ConversationPanel({
       </div>
 
       {/* ─── 分类标签 ─── */}
-      <div className="flex gap-1.5 px-4 pb-3 overflow-x-auto border-b border-slate-100">
+      <div className="flex gap-1.5 px-4 pb-3 overflow-x-auto border-b border-slate-200/50">
         {CATEGORIES.map((cat) => (
           <button
             key={cat.key}
@@ -125,7 +121,7 @@ export default function ConversationPanel({
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-all duration-150
               ${filter === cat.key
                 ? "bg-slate-900 text-white shadow-sm"
-                : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"}`}
+                : "text-slate-500 hover:text-slate-700 hover:bg-white/80"}`}
           >
             {cat.label}
           </button>
@@ -136,7 +132,7 @@ export default function ConversationPanel({
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center gap-3 py-12">
-            <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-xl bg-white border border-slate-200/50 flex items-center justify-center">
               <MessageSquare className="w-6 h-6 text-slate-300" />
             </div>
             <p className="text-sm text-slate-400">
@@ -153,20 +149,16 @@ export default function ConversationPanel({
             )}
           </div>
         ) : filter === "all" ? (
-          /* ─── 分组视图（全部标签下） ─── */
           (["active", "draft", "finalized", "archived"] as const).map((status) => {
             const items = grouped[status];
             if (!items?.length) return null;
             return (
               <div key={status} className="mb-2">
-                {/* 组标题 */}
                 <div className="flex items-center gap-2 px-1 py-1.5">
                   <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
                     {CATEGORIES.find((c) => c.key === status)?.label}
                   </span>
-                  <span className="text-[10px] text-slate-300 font-mono">
-                    {items.length}
-                  </span>
+                  <span className="text-[10px] text-slate-300 font-mono">{items.length}</span>
                 </div>
                 {items.map((c) => (
                   <ConversationCard
@@ -186,7 +178,6 @@ export default function ConversationPanel({
             );
           })
         ) : (
-          /* ─── 单分类扁平视图 ─── */
           filtered.map((c) => (
             <ConversationCard
               key={c.id}
@@ -208,7 +199,7 @@ export default function ConversationPanel({
 }
 
 /* ──────────────────────────────────────────────
- * ConversationCard — 对话卡片子组件
+ * ConversationCard — Linear 级极简卡片
  * ────────────────────────────────────────────── */
 function ConversationCard({
   conversation: c,
@@ -236,18 +227,20 @@ function ConversationCard({
   return (
     <div
       onClick={onSelect}
-      className={`group relative p-4 mb-2 rounded-xl border cursor-pointer transition-all duration-150
-        ${active
-          ? "bg-blue-50/40 border-blue-100"
-          : "bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/60"}`}
+      className={`group relative p-4 mb-3 bg-white rounded-xl border cursor-pointer transition-all duration-200
+        shadow-[0_1px_2px_rgba(0,0,0,0.02)]
+        ${
+          active
+            ? "bg-blue-50/40 border-blue-200/80"
+            : "border-slate-200/50 hover:border-slate-300 hover:shadow-md"
+        }`}
     >
-      {/* 激活状态左侧指示条 */}
+      {/* 激活指示器 */}
       {active && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-full bg-blue-600" />
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-full bg-blue-600 shadow-[0_0_6px_rgba(59,130,246,0.4)]" />
       )}
 
       <div className="flex items-start justify-between gap-3 pl-1">
-        {/* 文本区 */}
         <div className="flex-1 min-w-0">
           {editing ? (
             <input
@@ -261,17 +254,17 @@ function ConversationCard({
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <p
-              onDoubleClick={onStartRename}
-              className={`text-sm tracking-tight truncate ${
-                active ? "text-slate-800 font-semibold" : "text-slate-800 font-semibold"
-              }`}
-            >
-              {c.title}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p
+                onDoubleClick={onStartRename}
+                className="text-sm font-semibold text-slate-800 tracking-tight truncate"
+              >
+                {c.title}
+              </p>
+              {active && <ChevronRight className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />}
+            </div>
           )}
 
-          {/* 元信息 */}
           <div className="flex items-center gap-2 mt-1.5">
             <span className="text-xs text-slate-400 font-normal">
               {c.message_count} 轮 · {c.snapshot_count} 个演示
@@ -289,12 +282,12 @@ function ConversationCard({
 
         {/* 右侧操作区 */}
         <div className="flex flex-col items-end gap-2 flex-shrink-0">
-          {/* 状态 Badge */}
-          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-md ${badge.className}`}>
+          <span
+            className={`text-[11px] font-medium px-2 py-0.5 rounded-full shadow-sm ${badge.className}`}
+          >
             {badge.label}
           </span>
 
-          {/* 删除按钮 */}
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
             className="flex items-center justify-center w-7 h-7 rounded-lg
