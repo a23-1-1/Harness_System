@@ -27,8 +27,7 @@ class Conversation(Base):
     teacher_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(256), default="")
     status: Mapped[str] = mapped_column(
-        String(16), default="active",
-        CheckConstraint("status IN ('active','draft','finalized','archived')"),
+        String(16), CheckConstraint("status IN ('active','draft','finalized','archived')"), default="active",
     )
     demo_type: Mapped[str | None] = mapped_column(String(8), nullable=True)
     tags = Column(JSON, default=list)
@@ -55,12 +54,10 @@ class Message(Base):
         String(36), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True
     )
     role: Mapped[str] = mapped_column(
-        String(16), nullable=False,
-        CheckConstraint("role IN ('user','assistant','system','agent')"),
+        String(16), CheckConstraint("role IN ('user','assistant','system','agent')"), nullable=False,
     )
     type: Mapped[str] = mapped_column(
-        String(24), nullable=False,
-        CheckConstraint("type IN ('text','sql','image','demo_snapshot','tool_call','quiz','knowledge')"),
+        String(24), CheckConstraint("type IN ('text','sql','image','demo_snapshot','tool_call','quiz','knowledge')"), nullable=False,
     )
     content = Column(JSON, nullable=False, default=dict)
     metadata_ = Column("metadata", JSON, default=dict)
