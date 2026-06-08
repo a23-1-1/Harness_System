@@ -1,14 +1,40 @@
 @import "tailwindcss";
 
 :root {
-  --color-primary: #3b82f6;
-  --color-primary-hover: #2563eb;
-  --color-bg: #f1f5f9;
-  --color-surface: #ffffff;
-  --color-sidebar: #f8fafc;
-  --color-border: #e2e8f0;
-  --color-text: #0f172a;
-  --color-text-secondary: #64748b;
+  /* 核心暗色系 */
+  --color-bg: #0f1117;
+  --color-surface: #1a1b26;
+  --color-surface-hover: #1e1f2b;
+  --color-surface-active: #24253b;
+  --color-border: #292e42;
+  --color-border-light: #333952;
+
+  /* 文字 */
+  --color-text: #c0caf5;
+  --color-text-secondary: #565f89;
+  --color-text-muted: #3b4261;
+
+  /* 霓虹点缀 */
+  --color-accent: #7aa2f7;
+  --color-accent-hover: #89b4fa;
+  --color-accent-glow: rgba(122, 162, 247, 0.15);
+  --color-green: #9ece6a;
+  --color-green-dim: rgba(158, 206, 106, 0.15);
+  --color-amber: #e0af68;
+  --color-amber-dim: rgba(224, 175, 104, 0.15);
+  --color-red: #f7768e;
+  --color-red-dim: rgba(247, 118, 142, 0.15);
+  --color-cyan: #7dcfff;
+  --color-purple: #bb9af7;
+
+  /* 代码 */
+  --color-code-bg: #0d0e14;
+  --color-code-text: #a9b1d6;
+  --color-code-keyword: #bb9af7;
+  --color-code-string: #9ece6a;
+  --color-code-number: #ff9e64;
+  --color-code-comment: #565f89;
+  --color-code-function: #7aa2f7;
 }
 
 * {
@@ -19,23 +45,49 @@
 
 html, body, #root {
   height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, "Noto Sans SC", sans-serif;
+  font-family: "JetBrains Mono", "Cascadia Code", "Fira Code", "Consolas",
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
   background: var(--color-bg);
   color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
-/* 自定义滚动条（轻量 IDE 风格） */
+/* 暗色滚动条 */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #292e42;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #3b4261;
+}
+
+/* 选中色 */
+::selection {
+  background: var(--color-accent-glow);
+  color: var(--color-text);
+}
+
+/* 输入框通用样式 */
+input, textarea, select {
+  font-family: inherit;
+}
+input::placeholder, textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* 毛玻璃效果 */
+.glass {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.glass-subtle {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
