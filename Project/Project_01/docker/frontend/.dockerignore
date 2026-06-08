@@ -1,0 +1,16 @@
+# ─── Docker ignore — 前端 ──────────────────────────────────────
+node_modules/
+dist/
+build/
+.vite/
+*.log
+.env
+.env.local
+.env.development
+.git/
+.gitignore
+*.md
+tests/
+__tests__/
+.DS_Store
+Thumbs.db
