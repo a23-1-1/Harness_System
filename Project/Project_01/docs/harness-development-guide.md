@@ -14,7 +14,7 @@
 - [4. 结合你的项目：DB Demo Studio 开发路线图](#4-结合你的项目db-demo-studio-开发路线图)
 - [5. 开发工作流：PIV 循环（Plan → Implement → Verify）](#5-开发工作流piv-循环plan--implement--verify)
 - [6. 会话交接：跨会话不丢上下文](#6-会话交接跨会话不丢上下文)
-- [7. 多分支协作：baseline vs improved](#7-多分支协作baseline-vs-improved)
+- [7. 多分支协作：项目目录区分策略](#7-多分支协作项目目录区分策略)
 - [8. 常见错误 & 避坑指南](#8-常见错误--避坑指南)
 - [9. 检查清单：你的项目现在处于什么阶段](#9-检查清单你的项目现在处于什么阶段)
 
@@ -268,11 +268,10 @@ feat-010 性能优化 ←──────────────────�
 ### 4.1 当前 Git 分支结构
 
 ```
-master (仅目录结构)
- ├── project-01
- │   ├── p01-baseline ← 当前正在做的分支（Harness 已配好）
- │   └── p01-improved ← 未来改进版（可以有不同的 CLAUDE.md）
- └── project-02       ← 另一个项目
+master
+├── Project/
+│   ├── Project_01/   → DB Demo Studio（AI 协作式数据库课程演示工作台）
+│   └── project_02/   → 另一个项目
 ```
 
 ### 4.2 推荐的开发节奏（周计划）
@@ -319,7 +318,7 @@ Day 4-5: 流式响应 + 用户打断 + 教师 Profile 加载
 ┌─────────────────────────────────────────────────────┐
 │              开始一个新功能                           │
 ├─────────────────────────────────────────────────────┤
-│ 1. git switch p01-baseline                          │
+│ 1. 确认在 master 分支上                            │
 │ 2. 读 CLAUDE.md                                     │
 │ 3. 读 feature_list.json → 找到下一个未完成功能        │
 │ 4. 读 progress.md → 了解上次进度                     │
@@ -405,7 +404,7 @@ session-handoff.md     会话快照（具体到文件:行号 + 失败原因）
 ✅ **好的交接**：
 ```
 ## 当前状态
-- 分支: p01-baseline, feat-003 (P0 即时演示)
+- 模块: Project/Project_01, feat-003 (P0 即时演示)
 - 编译: ✅ | 测试: 23/25 通过（2 个失败在 test_ws_reconnect.py:45）
 
 ## 已完成
@@ -429,45 +428,41 @@ session-handoff.md     会话快照（具体到文件:行号 + 失败原因）
 
 ---
 
-## 7. 多分支协作：baseline vs improved
+## 7. 模块管理与对比策略
 
-你的分支结构天然支持 **Harness A/B 对比**：
+本仓库采用单 `master` 主分支，所有模块通过目录区分。如果你希望实验不同的实现方案，可以在工作区内创建对比实验目录（例如 `Project_01_experiment/`），而非使用多分支。
 
-### 7.1 baseline 分支策略
+### 7.1 标准实现
 
 ```
-p01-baseline:
+Project/Project_01:
   目标：按部就班，遵循 requirements-spec.md 的标准架构
   CLAUDE.md: 严格的 MUST/SHOULD/WONT 规则
   feature_list.json: 10 个功能按依赖顺序
   init.sh: 标准环境
 ```
 
-### 7.2 improved 分支策略
+### 7.2 改进实验（可选的目录级对比方案）
 
 ```
-p01-improved:
+Project/Project_01_experiment/:
   目标：探索更好的架构或更快的实现方式
   CLAUDE.md: 更宽松的策略，允许 Agent 提出架构改进
-  feature_list.json: 可以和 baseline 不同——也许把某些功能合并
+  feature_list.json: 可以和标准版不同
   init.sh: 可以用不同的工具栈（比如试试 uv 替代 pip）
 ```
 
 ### 7.3 对比方法
 
-两个分支做完后，用 `validate-harness.mjs` 审计：
+两个模块目录做完后，用 `validate-harness.mjs` 审计：
 
 ```bash
-# 在 p01-baseline 上
-git switch p01-baseline
-node ~/.claude/skills/harness-creator/scripts/validate-harness.mjs --target .
+node ~/.claude/skills/harness-creator/scripts/validate-harness.mjs --target Project/Project_01
 
-# 在 p01-improved 上  
-git switch p01-improved
-node ~/.claude/skills/harness-creator/scripts/validate-harness.mjs --target .
+node ~/.claude/skills/harness-creator/scripts/validate-harness.mjs --target Project/Project_01_experiment
 ```
 
-对比五个子系统的评分，找到哪个方案更有效。
+对比五个子系统的评分，找到更有效的方案。
 
 ---
 
@@ -518,7 +513,7 @@ node ~/.claude/skills/harness-creator/scripts/validate-harness.mjs --target .
 
 ### ✅ 已就绪
 
-- [x] Git 仓库 + 分支体系（master / project-01 / p01-baseline / p01-improved / project-02）
+- [x] Git 仓库 + 单 `master` 主分支，模块通过目录区分
 - [x] `CLAUDE.md`（React + FastAPI + WebSocket 技术栈，完整规则）
 - [x] `feature_list.json`（10 个功能，带依赖关系）
 - [x] `init.sh`（前后端 + Docker 环境检测）
@@ -535,7 +530,7 @@ node ~/.claude/skills/harness-creator/scripts/validate-harness.mjs --target .
 ### 🎯 下一步行动
 
 ```
-1. 保持在 p01-baseline 分支
+1. 保持在 master 分支，进入 Project/Project_01 工作目录
 2. 开始 feat-001：项目脚手架
    ├─ 创建目录结构（frontend/, backend/, docker/, mcp-servers/）
    ├─ Docker Compose 配置

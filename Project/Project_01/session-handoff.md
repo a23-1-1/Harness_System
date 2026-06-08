@@ -2,9 +2,9 @@
 
 ## Current Objective
 
-- Goal: 完成 feat-001 项目脚手架（Streamlit + Claude API + 对话界面）
+- Goal: 完成 feat-001 项目脚手架（FastAPI + React + WebSocket 骨架）
 - Current status: 待开始
-- Branch: p01-baseline
+- Branch: master
 
 ## Completed This Session
 

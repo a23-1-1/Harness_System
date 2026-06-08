@@ -552,32 +552,33 @@ Layer 5: 产品闸门（每周五，<5min）
 
 ---
 
-## 八、分支策略与协作方案
+## 八、模块管理与对比方案
 
-### 8.1 分支角色定义
+### 8.1 模块角色定义
 
-| 分支 | 角色 | Harness 配置 | 什么在上面开发 |
-|------|------|------------|--------------|
-| `p01-baseline` | **标准实现** | 完整最大 Harness | 按 requirements-spec.md 逐步实现所有功能 |
-| `p01-improved` | **改进实验** | 复制 baseline Harness → 调整 CLAUDE.md（更激进规则） | 实验性优化（不同架构方案、不同 LLM 策略） |
-| `project-01` | **汇合点** | 最简 Harness | 当 baseline 和 improved 都做完后，merge 选择的方案 |
+本仓库采用单 `master` 主分支，所有项目模块通过目录区分：
+
+| 目录 | 角色 | 说明 |
+|------|------|------|
+| `Project/Project_01` | **DB Demo Studio 标准实现** | 按 requirements-spec.md 逐步实现所有功能 |
+| `Project/project_02` | **第二个项目** | 待初始化 |
+| `Project/Project_01_experiment` (可选) | **改进实验** | 如需对比不同方案，可创建实验目录 |
 
 ### 8.2 开发流程
 
 ```
-1. 始终在 p01-baseline 上开发标准版本
-   ├─ 每个功能：feature 分支 → PR → merge 到 p01-baseline
-   └─ 用法：git checkout -b feat-001 p01-baseline
+1. 始终在 master 分支上开发，进入 Project/Project_01 工作
+   ├─ 每次功能开发：创建临时 feature 分支 → PR → merge 回 master
+   └─ 用法：git checkout -b feat-001 master
 
-2. 当一个功能在 baseline 完成并验证后：
-   ├─ 切换到 p01-improved
-   ├─ cherry-pick baseline 的工作
-   ├─ 调整实现（不同的架构/技术方案）
-   └─ 对比两个分支的效果
+2. 当需要实验不同的实现方案时：
+   ├─ 在 Project/ 下创建实验目录（如 Project_01_experiment）
+   ├─ 复制标准版 Harness → 调整 CLAUDE.md（不同策略）
+   └─ 对比两个目录的 Harness 审计评分
 
 3. 最终：
    ├─ 选择表现更好的方案
-   └─ merge 到 project-01（或其他主分支）
+   └─ 更新到 `Project/Project_01`
 ```
 
 ---

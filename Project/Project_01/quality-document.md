@@ -82,7 +82,7 @@
 
 ## 开发就绪检查
 
-- [x] Git 分支结构（p01-baseline / p01-improved / project-01 / project-02）
+- [x] Git 单 `master` 主分支，模块通过目录区分
 - [x] 完整 Harness 文件集（15 个文件）
 - [x] 完整文档（6 篇）
 - [x] 10 个功能已定义含依赖关系

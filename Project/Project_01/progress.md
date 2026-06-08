@@ -13,7 +13,7 @@
 
 ### What's Done
 
-- [x] Git 分支体系搭建（p01-baseline / p01-improved）
+- [x] Git 仓库初始化，采用单 `master` 主分支，模块通过目录区分
 - [x] Agent harness 创建 & 定制化（基于 requirements-spec.md v5 优化）
 - [x] 明确完整技术栈（React 19 + FastAPI + WebSocket + Redis + PG + Docker）
 

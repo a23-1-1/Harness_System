@@ -19,15 +19,14 @@ Harness_Basic_Learning/
 └── README.md
 ```
 
-## 分支说明
+## 项目组织
 
-| 分支 | 用途 |
+所有代码按目录区分模块，不使用多分支体系：
+
+| 目录 | 内容 |
 |------|------|
-| `master` | 仅目录结构，不含业务代码 |
-| `project-01` | Project_01 的汇合分支 |
-| `p01-baseline` | Project_01 标准实现（按 requirements-spec.md 逐步开发） |
-| `p01-improved` | Project_01 改进实验（不同架构/策略对比） |
-| `project-02` | project_02 的工作分支 |
+| `Project/Project_01/` | DB Demo Studio（AI 协作式数据库课程演示工作台） |
+| `Project/project_02/` | 第二个项目（待初始化） |
 
 ## 核心项目：DB Demo Studio
 
