@@ -25,6 +25,8 @@ interface DemoStep {
   content: string;
   stage?: string;
   interactive_hint?: string;
+  mermaid?: string;
+  mermaid_type?: string;
 }
 
 interface DemoComplete {

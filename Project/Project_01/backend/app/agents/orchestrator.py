@@ -5,6 +5,7 @@ DB Demo Studio — Orchestrator Agent
 支持流式 step:preview 推送、用户可打断（per-conversation）、单步重写、demo_snapshot 持久化。
 """
 import asyncio
+import html
 import json
 import logging
 import uuid
@@ -16,6 +17,9 @@ from app.llm.gateway import llm_gateway
 from app.database import async_session_factory
 from app.models.conversation import Conversation, Message, Demo
 from app.redis_cache import redis_cache
+from app.mcp.registry import mcp_registry
+from app.mcp.servers.sql_analyze import analyze_sql
+from app.mcp.servers.mermaid_gen import generate_mermaid
 
 logger = logging.getLogger(__name__)
 
@@ -76,9 +80,15 @@ class OrchestratorAgent:
                 "message": "正在分析输入内容，识别教学意图…",
             })
 
-            # 4. 调用 LLM Gateway 生成演示
+            # 4. 尝试 SQL 分析（如果输入看起来像 SQL）
+            sql_analysis = None
+            if self._looks_like_sql(content):
+                sql_analysis = analyze_sql(content)
+                logger.info("SQL 分析完成", extra={"data": {"convId": conv_id, "tables": len(sql_analysis.get("tables", []))}})
+
+            # 5. 调用 LLM Gateway 生成演示（传入分析结果作为上下文）
             try:
-                result = await llm_gateway.generate_demo(content, conv_id)
+                result = await llm_gateway.generate_demo(content, conv_id, sql_analysis=sql_analysis)
                 steps = result.get("steps", [])
             except asyncio.CancelledError:
                 raise  # 由 manager.py 的 task.cancel() 发起，向上传播
@@ -99,7 +109,16 @@ class OrchestratorAgent:
                 await self._notify_interrupted(ws_manager, websocket)
                 return
 
-            # 6. 推送每个步骤的预览（流式生成）
+            # 6. 为缺少 mermaid 的步骤自动生成可视化（使用 SQL 分析结果）
+            if sql_analysis:
+                for step in steps:
+                    if not step.get("mermaid"):
+                        mermaid_result = generate_mermaid(sql_analysis, step.get("stage", ""))
+                        if mermaid_result.get("mermaid"):
+                            step["mermaid"] = mermaid_result["mermaid"]
+                            step["mermaid_type"] = mermaid_result.get("diagram_type", "flowchart")
+
+            # 7. 推送每个步骤的预览（流式生成）
             for step in steps:
                 if self._check_interrupted(conv_id):
                     await self._notify_interrupted(ws_manager, websocket)
@@ -114,6 +133,8 @@ class OrchestratorAgent:
                     "stage": stage,
                     "stageLabel": stage_label,
                     "interactiveHint": step.get("interactive_hint", ""),
+                    "mermaid": step.get("mermaid", ""),
+                    "mermaidType": step.get("mermaid_type", ""),
                 })
 
             # 7. 保存 AI 回复消息 + demo_snapshot 到 PG
@@ -250,6 +271,93 @@ class OrchestratorAgent:
             "stageLabel": self._stage_label(original_stage),
             "interactiveHint": original_step.get("interactive_hint", ""),
         })
+
+    async def export_demo(self, websocket, ws_manager, conv_id: str, payload: dict):
+        """导出当前演示（demo:export）"""
+        fmt = payload.get("format", "html")
+
+        async with async_session_factory() as db:
+            # 加载最新 snapshot
+            result = await db.execute(
+                select(Message)
+                .where(Message.conv_id == conv_id, Message.type == "demo_snapshot")
+                .order_by(Message.created_at.desc())
+                .limit(1)
+            )
+            snapshot_msg = result.scalar_one_or_none()
+
+            result = await db.execute(
+                select(Conversation).where(Conversation.id == conv_id)
+            )
+            conv = result.scalar_one_or_none()
+
+        if not snapshot_msg:
+            await ws_manager.send_personal(websocket, "error", {
+                "code": "NO_DEMO",
+                "message": "当前对话没有演示可以导出",
+            })
+            return
+
+        steps = snapshot_msg.content.get("steps", [])
+        title = snapshot_msg.content.get("title", conv.title if conv else "演示")
+
+        if fmt == "html":
+            # 生成独立 HTML 教学页
+            stage_labels = {
+                "lex": "词法分析", "parse": "语法解析",
+                "optimize": "查询优化", "plan": "执行计划",
+                "execute": "执行过程", "result": "结果分析",
+            }
+            cards_html = "".join(
+                f"""<div class="step-card">
+                    <div class="step-header">
+                        <span class="step-num">{s.get("index", i+1)}</span>
+                        <span class="stage-badge">{html.escape(stage_labels.get(s.get("stage",""), s.get("stage","")))}</span>
+                        <strong>{html.escape(s.get("title",""))}</strong>
+                    </div>
+                    <p>{html.escape(s.get("content",""))}</p>
+                </div>"""
+                for i, s in enumerate(steps)
+            )
+            html_content = f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>{html.escape(title)} — DB Demo Studio</title>
+<style>
+* {{ margin:0; padding:0; box-sizing:border-box; }}
+body {{ font-family:-apple-system,system-ui,sans-serif; background:#f1f5f9; color:#1e293b; padding:40px 20px; }}
+.container {{ max-width:800px; margin:0 auto; }}
+h1 {{ font-size:1.8rem; margin-bottom:8px; }}
+.sub {{ color:#64748b; font-size:0.95rem; margin-bottom:32px; }}
+.step-card {{ background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-bottom:16px; }}
+.step-header {{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }}
+.step-num {{ background:#2563eb; color:#fff; width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:0.8rem; font-weight:700; }}
+.stage-badge {{ background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe; border-radius:999px; padding:2px 10px; font-size:0.75rem; font-weight:600; }}
+.step-card p {{ line-height:1.7; color:#475569; }}
+.footer {{ text-align:center; margin-top:40px; color:#94a3b8; font-size:0.85rem; }}
+</style></head>
+<body><div class="container">
+<h1>{html.escape(title)}</h1>
+<p class="sub">由 DB Demo Studio AI 协作生成</p>
+{cards_html}
+<div class="footer">DB Demo Studio — AI 协作式数据库课程演示工作台</div>
+</div></body></html>"""
+
+            await ws_manager.send_personal(websocket, "demo:exported", {
+                "format": "html",
+                "content": html_content,
+                "filename": f"{html.escape(title[:20])}.html",
+            })
+        else:
+            await ws_manager.send_personal(websocket, "error", {
+                "code": "UNSUPPORTED_FORMAT",
+                "message": f"不支持的导出格式: {fmt}",
+            })
+
+    @staticmethod
+    def _looks_like_sql(text: str) -> bool:
+        """检测输入是否像是 SQL 语句"""
+        upper = text.strip().upper()
+        return any(upper.startswith(kw) for kw in ("SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER", "WITH", "EXPLAIN", "SHOW"))
 
     async def _save_user_message(self, conv_id: str, msg_type: str, content: str) -> str:
         """保存用户消息到 PG，返回消息 ID"""

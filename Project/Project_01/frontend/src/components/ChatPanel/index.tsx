@@ -8,6 +8,7 @@ import {
   Loader2,
   SendHorizonal,
   Sparkles,
+  Square,
   Terminal,
 } from "lucide-react";
 import type { Conversation, WsMessage } from "../../types";
@@ -19,6 +20,8 @@ interface Props {
   activeConv: string | null;
   activeConversation: Conversation | null;
   onCreateConversation: (title?: string) => void;
+  isGenerating?: boolean;
+  onInterrupt?: () => void;
 }
 
 const QUICK_CARDS = [
@@ -82,6 +85,8 @@ export default function ChatPanel({
   activeConv,
   activeConversation,
   onCreateConversation,
+  isGenerating,
+  onInterrupt,
 }: Props) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -187,6 +192,16 @@ export default function ChatPanel({
           />
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 px-5 py-3">
             <div className="flex flex-wrap items-center gap-2">
+              {isGenerating && (
+                <button
+                  type="button"
+                  onClick={onInterrupt}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-red-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-500/20 transition hover:bg-red-600 active:scale-95"
+                >
+                  <Square />
+                  停止生成
+                </button>
+              )}
               <button
                 type="button"
                 onClick={insertSqlTemplate}

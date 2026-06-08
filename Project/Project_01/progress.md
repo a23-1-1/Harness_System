@@ -6,12 +6,48 @@
 ## Current State
 
 **Last Updated:** 2026-06-08
-**Session ID:** 003
-**Active Feature:** feat-003 — P0 即时演示 6 阶段分步讲解
+**Session ID:** 004
+**Active Feature:** feat-004 — P1 轻量可视化 & EXPLAIN 引擎集成
 
 ## Status
 
 ### What's Done
+
+#### feat-001 / feat-002 / feat-003 ✅（全部完成）
+- 见 progress.md 历史记录
+
+#### feat-004 P1 轻量可视化 & EXPLAIN 引擎集成 ✅（已全部完成）
+
+- [x] **explain-engine MCP 服务器** (`backend/app/mcp/servers/explain_engine.py`)
+  - MySQL 8.0 EXPLAIN FORMAT=JSON（aiomysql）
+  - PostgreSQL 16 EXPLAIN (FORMAT JSON)（asyncpg）
+  - 只读 SQL 白名单（SELECT/WITH/EXPLAIN）防注入
+  - Docker 双容器启动健康验证通过 ✅
+  - 端到端 EXPLAIN 调用验证通过 ✅
+
+- [x] **mermaid-gen MCP 服务器** (`backend/app/mcp/servers/mermaid_gen.py`)
+  - 6 阶段对应图类型，MCP Registry 注册 5 个工具
+
+- [x] **Orchestrator 集成 + LLM Prompt 增强** — SQL 分析注入 mermaid 自动生成
+- [x] **前端 MermaidRenderer** — 单例 import，错误 fallback
+- [x] **feature_list.json** — feat-004 标记 done
+
+## Files Modified This Session
+
+- `backend/app/mcp/servers/explain_engine.py` — 新建
+- `backend/app/mcp/servers/mermaid_gen.py` — 新建
+- `backend/app/mcp/servers/__init__.py` — 注册新工具
+- `backend/app/agents/orchestrator.py` — SQL 分析 + mermaid 自动生成
+- `backend/app/llm/gateway.py` — 增强 prompt + sql_analysis 注入
+- `frontend/src/types.d.ts` — DemoStep mermaid 字段
+- `frontend/src/components/DemoPreview/index.tsx` — MermaidRenderer
+- `frontend/package.json` — 添加 mermaid 依赖
+
+## Notes for Next Session
+
+1. 启动 EXPLAIN 引擎：`docker compose up -d mysql-explain pgexplain`
+2. 安装 aiomysql + asyncpg：`pip install aiomysql asyncpg`
+3. 验证：发送 "SELECT * FROM students JOIN scores ON students.id = scores.student_id" 检查 mermaid 字段
 
 #### feat-001 项目脚手架 ✅（已全部完成）
 - [x] Git 仓库初始化，单 `master` 主分支，模块通过目录区分

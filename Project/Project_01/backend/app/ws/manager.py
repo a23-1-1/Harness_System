@@ -21,7 +21,6 @@ class ConnectionManager:
         self.websocket_map: dict[WebSocket, str] = {}
         # per-conv 正在运行的 process_message 任务，用于精确打断
         self._active_tasks: dict[str, asyncio.Task] = {}
-        self._send_locks: dict[WebSocket, asyncio.Lock] = {}
         self.heartbeat_interval = 30
 
     async def connect(self, websocket: WebSocket, conv_id: str, teacher_id: str):
@@ -35,7 +34,6 @@ class ConnectionManager:
 
     async def disconnect(self, websocket: WebSocket):
         conv_id = self.websocket_map.pop(websocket, None)
-        self._send_locks.pop(websocket, None)  # 清理发送锁
         if conv_id and conv_id in self.active_connections:
             self.active_connections[conv_id].pop(websocket, None)
             if not self.active_connections[conv_id]:
@@ -83,7 +81,10 @@ class ConnectionManager:
                         orchestrator.process_message(websocket, self, conv_id, payload)
                     )
                     self._active_tasks[conv_id] = task
-                    task.add_done_callback(lambda t: self._active_tasks.pop(conv_id, None))
+                    def _cleanup(t: asyncio.Task, cid=conv_id):
+                        if self._active_tasks.get(cid) is t:
+                            self._active_tasks.pop(cid, None)
+                    task.add_done_callback(_cleanup)
 
                 elif event == "chat:interrupt":
                     from app.agents.orchestrator import orchestrator
@@ -94,6 +95,12 @@ class ConnectionManager:
                     from app.agents.orchestrator import orchestrator
                     task = asyncio.create_task(
                         orchestrator.regenerate_step(websocket, self, conv_id, payload)
+                    )
+
+                elif event == "demo:export":
+                    from app.agents.orchestrator import orchestrator
+                    task = asyncio.create_task(
+                        orchestrator.export_demo(websocket, self, conv_id, payload)
                     )
 
                 elif event == "ping":

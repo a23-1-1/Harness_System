@@ -66,6 +66,36 @@ SYSTEM_PROMPT = """你是一个数据库课程教学助手——DB Demo Studio �
 
 当用户输入数据库概念（非 SQL）时，按知识点教学逻辑分 3-6 步讲解，每步的 stage 使用教学阶段名称（如 concept、example、summary 等）。
 
+## 可视化增强
+
+如果用户要求「加图表」「画图」「可视化」「Mermaid」「流程图」「ER 图」等，请在步骤中添加 mermaid 字段。
+
+SQL 查询的 6 阶段按以下对应生成默认 Mermaid 图：
+
+| 阶段 | 推荐图类型 | 图示内容 |
+|------|-----------|---------|
+| lex | flowchart LR | 关键字 → 标识符 → 运算符 的 token 序列 |
+| parse | erDiagram | 表之间的关系（JOIN 或引用） |
+| optimize | flowchart TD | 多个执行策略的代价对比决策树 |
+| plan | flowchart TD | 执行计划树（算子层级） |
+| execute | sequenceDiagram | 存储引擎与表之间的数据流交互 |
+| result | flowchart LR | 查询结果概览 |
+
+```json
+{
+  "index": 3,
+  "stage": "optimize",
+  "title": "查询优化策略对比",
+  "content": "优化器在全表扫描和索引扫描之间选择...",
+  "mermaid": "flowchart TD\n  A[全表扫描 cost=100] --> E[选择索引扫描]\n  C[索引扫描 cost=20] --> E"
+}
+```
+
+如果用户没有明确要求可视化，选择 1-2 个最关键的阶段添加 mermaid 字段（无需每个阶段都有）。
+
+当用户输入的是数据库概念（非 SQL）时，按知识点教学逻辑分 3-6 步讲解，每步的 stage 使用教学阶段名称（如 concept、example、summary 等）。
+```
+
 ## 教学风格要求
 
 - 语言通俗易懂，多用类比和比喻
@@ -104,13 +134,31 @@ class LLMGateway:
             return SILICONFLOW_MODEL
         return DEEPSEEK_MODEL
 
-    async def generate_demo(self, user_input: str, conv_id: str, teacher_profile: Optional[dict] = None) -> dict:
+    async def generate_demo(self, user_input: str, conv_id: str,
+                            teacher_profile: Optional[dict] = None,
+                            sql_analysis: Optional[dict] = None) -> dict:
         """根据用户输入生成教学演示
 
         支持 Redis LLM 缓存，相同 prompt 在 1 小时内命中缓存。
+        可选传入 sql_analysis 结果作为上下文，帮助 LLM 生成更准确的演示。
         """
         # 构建 prompt
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        system_msg = SYSTEM_PROMPT
+        if sql_analysis:
+            tables = sql_analysis.get("tables", [])
+            columns = sql_analysis.get("columns", [])
+            keywords = sql_analysis.get("keywords", [])
+            join_type = sql_analysis.get("join_type", "")
+            analysis_summary = f"""
+## SQL 分析结果（供参考）
+- 表: {', '.join(t['name'] for t in tables) if tables else '未识别'}
+- 列: {', '.join(columns[:8]) if columns else '未识别'}
+- 关键字: {', '.join(keywords[:10]) if keywords else '未识别'}
+- JOIN 类型: {join_type or '无'}
+"""
+            system_msg += analysis_summary
+
+        messages = [{"role": "system", "content": system_msg}]
         if teacher_profile:
             style = teacher_profile.get("style", {})
             style_hint = f"请使用以下风格：正式程度={style.get('formality', 'medium')}，技术深度={style.get('depth', 'medium')}。"

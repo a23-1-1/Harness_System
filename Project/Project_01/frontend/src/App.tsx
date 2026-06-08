@@ -37,11 +37,45 @@ export default function App() {
     [wsMessages],
   );
 
+  const isGenerating = useMemo(() => {
+    for (let i = wsMessages.length - 1; i >= 0; i--) {
+      const m = wsMessages[i];
+      if (m.event === "demo:complete") return false;
+      if (m.event === "step:preview") return true;
+      if (m.event === "agent:thinking") {
+        const step = (m.payload as Record<string, unknown>)?.step;
+        if (step === "interrupted") return false; // 中断标记：生成已终止
+        return true; // analyze 等：正在生成
+      }
+      // ping, chat:message 等忽略，继续向前扫描
+    }
+    return false;
+  }, [wsMessages]);
+
   useEffect(() => {
     if (latestDemoMsg) {
       setLastDemo(latestDemoMsg.payload as unknown as DemoComplete);
     }
   }, [latestDemoMsg]);
+
+  // step:regenerated → 原地更新 lastDemo 中对应步骤的内容
+  useEffect(() => {
+    const last = wsMessages.length > 0 ? wsMessages[wsMessages.length - 1] : null;
+    if (!last || last.event !== "step:regenerated") return;
+    const p = last.payload as Record<string, unknown>;
+    const stepIndex = p.stepIndex as number;
+    if (stepIndex === undefined) return;
+    setLastDemo((prev) => {
+      if (!prev || !prev.steps[stepIndex]) return prev;
+      const newSteps = [...prev.steps];
+      newSteps[stepIndex] = {
+        ...newSteps[stepIndex],
+        title: (p.title as string) || newSteps[stepIndex].title,
+        content: (p.content as string) || newSteps[stepIndex].content,
+      };
+      return { ...prev, steps: newSteps };
+    });
+  }, [wsMessages]);
 
   const handleSend = (text: string) => {
     send("chat:message", { type: "text", content: text });
@@ -146,6 +180,8 @@ export default function App() {
                 activeConv={activeConv}
                 activeConversation={activeConversation}
                 onCreateConversation={handleCreateConv}
+                isGenerating={isGenerating}
+                onInterrupt={() => send("chat:interrupt", {})}
               />
             </div>
           </div>
@@ -161,7 +197,7 @@ export default function App() {
                   onToggle={() => setRightCollapsed(false)}
                 />
               ) : (
-                <DemoPreview demo={lastDemo} onCollapse={() => setRightCollapsed(true)} />
+                <DemoPreview demo={lastDemo} onCollapse={() => setRightCollapsed(true)} onExport={() => send("demo:export", { format: "html" })} onRegenerate={(stepIndex, instructions) => send("step:regenerate", { stepIndex, instructions })} />
               )}
             </div>
           </div>

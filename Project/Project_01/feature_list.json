@@ -21,16 +21,16 @@
       "name": "P0 即时演示 — 对话式生成 & 6 阶段分步讲解",
       "description": "对话输入 SQL/知识点 → AI 识别意图 → 生成 6 阶段演示（lex/parse/optimize/plan/execute/result）；流式生成预览（step:preview）+ 用户可打断；对话精修单步（F1.5）；Mermaid 流程图可视化（F2.1）；演示版本快照（F0.5）",
       "dependencies": ["feat-002"],
-      "status": "in-progress",
-      "evidence": "LLM System Prompt 升级为 P0 6 阶段标准结构（lex/parse/optimize/plan/execute/result）；Orchestrator Agent 支持 step:regenerate 局部重写 + chat:interrupt 打断；demo_snapshot 持久化到 PostgreSQL 的 messages 表和 demos 表；WebSocket manager 增加 step:regenerate 路由+interrupt flag；前端 DemoPreview 增加 6 阶段标识牌+阶段说明；ChatPanel 增加 StepPreviewMessage 组件+step:regenerated 显示"
+      "status": "done",
+      "evidence": "LLM System Prompt P0 6 阶段；Orchestrator Agent step:regenerate/chat:interrupt/demo_snapshot；WebSocket manager demo:export+create_task 非阻塞；前端 DemoPreview 6 阶段标识+自动播放+重写按钮+导出；ChatPanel 停止生成按钮+StepPreviewMessage；PG messages+demos 持久化+version 递增"
     },
     {
       "id": "feat-004",
       "name": "P1 轻量可视化 & EXPlAIN 引擎集成",
       "description": "Mermaid/ASCII/ECharts 对话式生成（F2.1-F2.3）；Docker MySQL 8.0:3308 + PostgreSQL 16:5433 作为 EXPLAIN 引擎；Nested Loop / Hash Join / Sort Merge 分步动画；对话调整样式/颜色/高亮",
       "dependencies": ["feat-003"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "done",
+      "evidence": "explain-engine MCP 服务器（MySQL FORMAT=JSON + PostgreSQL FORMAT JSON 只读白名单）；mermaid-gen MCP 服务器（6 阶段对应图类型）；MCP registry 5 工具注册；Orchestrator SQL 分析→mermaid 自动生成链路；LLM Gateway sql_analysis 注入；前端 MermaidRenderer（单例 import）；Docker EXPLAIN 引擎双容器启动健康验证；SQL JOIN 类型识别和 Mermaid 端到端验证通过"
     },
     {
       "id": "feat-005",
