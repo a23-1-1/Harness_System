@@ -1,29 +1,47 @@
-import { useState, useRef, useEffect } from "react";
-import { Sparkles, Database, Loader2, Terminal, SendHorizonal, Code2 } from "lucide-react";
-import type { WsMessage } from "../../types";
+import { useEffect, useRef, useState } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
+import {
+  Bot,
+  CheckCircle2,
+  Code2,
+  Database,
+  Loader2,
+  SendHorizonal,
+  Sparkles,
+  Terminal,
+} from "lucide-react";
+import type { Conversation, WsMessage } from "../../types";
 
 interface Props {
   messages: WsMessage[];
   onSend: (text: string) => void;
   connected: boolean;
   activeConv: string | null;
+  activeConversation: Conversation | null;
+  onCreateConversation: (title?: string) => void;
 }
 
 const QUICK_CARDS = [
   {
-    icon: "💡",
+    icon: "B+",
     title: "演示 B+ 树节点分裂",
-    desc: "可视化索引插入与平衡过程",
+    desc: "生成索引插入、节点分裂、父节点回填的逐步动画",
+    prompt:
+      "请生成一个 B+ 树插入导致叶子节点分裂的教学演示，包含每一步的节点变化、关键概念解释和课堂提问。",
   },
   {
-    icon: "⚡",
+    icon: "JOIN",
     title: "分析 JOIN 优化器代价",
-    desc: "对比 Nested Loop / Hash / Sort Merge",
+    desc: "对比 Nested Loop、Hash Join、Sort Merge 的代价选择",
+    prompt:
+      "请用 students 和 scores 表的 JOIN 查询，演示优化器如何在 Nested Loop、Hash Join 和 Sort Merge Join 之间选择执行计划。",
   },
   {
-    icon: "🔒",
+    icon: "TX",
     title: "演示 RR 级幻读",
-    desc: "双会话事务隔离级别模拟",
+    desc: "用双会话时间线解释隔离级别与锁行为",
+    prompt:
+      "请用两个事务会话演示 Repeatable Read 隔离级别下的幻读问题，展示时间线、SQL、锁等待和最终结果。",
   },
 ];
 
@@ -33,25 +51,32 @@ const EVENT_META: Record<
 > = {
   "step:preview": {
     label: "步骤预览",
-    bg: "bg-blue-50/20",
-    border: "border-blue-100/60",
+    bg: "bg-blue-50",
+    border: "border-blue-100",
     text: "text-blue-700",
   },
   "agent:thinking": {
     label: "工具调度",
-    bg: "bg-blue-50/20",
-    border: "border-blue-100/60",
+    bg: "bg-blue-50",
+    border: "border-blue-100",
     text: "text-blue-700",
   },
   "demo:complete": {
     label: "演示就绪",
-    bg: "bg-emerald-50/50",
-    border: "border-emerald-200/60",
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
     text: "text-emerald-700",
   },
 };
 
-export default function ChatPanel({ messages, onSend, connected, activeConv }: Props) {
+export default function ChatPanel({
+  messages,
+  onSend,
+  connected,
+  activeConv,
+  activeConversation,
+  onCreateConversation,
+}: Props) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -59,185 +84,249 @@ export default function ChatPanel({ messages, onSend, connected, activeConv }: P
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const sendCurrentInput = () => {
     if (!input.trim()) return;
     onSend(input.trim());
     setInput("");
   };
 
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    sendCurrentInput();
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      sendCurrentInput();
+    }
+  };
+
+  const insertSqlTemplate = () => {
+    setInput((current) =>
+      current.trim()
+        ? `${current}\n\nSQL:\nSELECT * FROM students WHERE score > 80;`
+        : "请基于下面 SQL 生成一个可视化教学演示：\n\nSELECT * FROM students WHERE score > 80;",
+    );
+  };
+
   return (
-    <div className="flex flex-col h-full">
-      {/* ─── 顶部状态栏 ─── */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_42%,#eef6ff_100%)]">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur">
         <div className="flex items-center gap-3">
-          <span className="relative flex w-2.5 h-2.5 items-center justify-center">
-            <span
-              className={`absolute inset-0 rounded-full ${
-                connected ? "bg-emerald-400 animate-ping opacity-40" : ""
-              }`}
-            />
-            <span
-              className={`relative w-2 h-2 rounded-full ${
-                connected ? "bg-emerald-500" : "bg-red-400"
-              }`}
-            />
-          </span>
-          <span className="text-xs font-medium text-slate-500">
-            {connected ? "已连接" : "未连接"}
-            {activeConv && (
-              <span className="ml-1.5 text-slate-400 font-mono">
-                / {activeConv.slice(0, 10)}
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/20">
+            <Bot className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-base font-semibold tracking-tight text-slate-900">
+              {activeConversation?.title || "AI 演示编排器"}
+            </p>
+            <div className="mt-0.5 flex items-center gap-2 text-sm text-slate-500">
+              <span className="relative flex h-2.5 w-2.5 items-center justify-center">
+                <span
+                  className={`absolute inset-0 rounded-full ${
+                    connected ? "animate-ping bg-emerald-400 opacity-40" : ""
+                  }`}
+                />
+                <span
+                  className={`relative h-2 w-2 rounded-full ${
+                    connected ? "bg-emerald-500" : "bg-red-400"
+                  }`}
+                />
               </span>
-            )}
-          </span>
+              {connected ? "已连接" : "未连接"}
+              {activeConv && (
+                <span className="hidden font-mono text-slate-400 sm:inline">
+                  / {activeConv.slice(0, 10)}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-slate-400">
-          <Terminal className="w-3.5 h-3.5 text-slate-400" />
-          DB Demo Studio
+        <div className="hidden items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-500 sm:flex">
+          <Terminal className="h-4 w-4 text-slate-400" />
+          Ctrl + Enter 发送
         </div>
       </div>
 
-      {/* ─── 消息流区域 ─── */}
-      <div className="flex-1 overflow-y-auto px-5 py-4">
+      <div className="scroll-area min-h-0 flex-1 overflow-y-auto px-6 pb-56 pt-6">
         {messages.length === 0 ? (
-          <WelcomeView onQuickSelect={onSend} />
+          <WelcomeView
+            onQuickSelect={setInput}
+            onCreateConversation={onCreateConversation}
+            hasActiveConversation={Boolean(activeConv)}
+          />
         ) : (
           <div className="space-y-4">
             {messages.map((msg, i) => (
-              <MessageBubble key={i} msg={msg} />
+              <MessageBubble key={`${msg.event}-${i}`} msg={msg} />
             ))}
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ─── 底部悬浮控制台 ─── */}
       <form
         onSubmit={handleSubmit}
-        className="sticky bottom-0 border-t border-slate-100 px-4 py-3 bg-white/80 backdrop-blur-md"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-5 pb-5"
       >
-        <div className="flex items-end gap-2 bg-slate-50/90 rounded-2xl border border-slate-200 px-3 py-2 transition-all duration-200 focus-within:border-blue-400/70 focus-within:ring-2 focus-within:ring-blue-400/15">
-          <button
-            type="button"
-            title="插入 SQL 代码块"
-            className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl
-                       text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-          >
-            <Code2 className="w-4 h-4" />
-          </button>
-          <input
-            type="text"
+        <div className="pointer-events-auto mx-auto max-w-4xl rounded-[1.75rem] border border-slate-200/90 bg-white/95 p-3 shadow-[0_24px_70px_rgba(15,23,42,0.18)] backdrop-blur-xl transition focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-100">
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="输入 SQL、知识点或修改指令…"
+            onKeyDown={handleKeyDown}
+            placeholder="输入 SQL、知识点或教学目标，例如：用动画解释 Hash Join 为什么适合大表等值连接"
             disabled={!connected}
-            className="flex-1 py-1.5 text-sm bg-transparent text-slate-800 placeholder:text-slate-400 outline-none disabled:opacity-40"
+            rows={3}
+            className="max-h-48 min-h-24 w-full resize-none bg-transparent px-4 py-3 text-base leading-relaxed text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-40"
           />
-          <button
-            type="submit"
-            disabled={!connected || !input.trim()}
-            className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-xl
-                       bg-slate-900 text-white
-                       hover:bg-slate-800 active:scale-95
-                       disabled:bg-slate-200 disabled:text-slate-300 disabled:cursor-not-allowed
-                       transition-all duration-150"
-          >
-            <SendHorizonal className="w-4 h-4" />
-          </button>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-2 pt-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={insertSqlTemplate}
+                className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3.5 py-2 text-sm font-medium text-slate-600 transition hover:bg-blue-50 hover:text-blue-700"
+              >
+                <Code2 className="h-4 w-4" />
+                SQL 模板
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setInput(
+                    "请把当前演示改成适合 10 分钟课堂讲解的版本，增加提问点和关键总结。",
+                  )
+                }
+                className="rounded-full bg-slate-100 px-3.5 py-2 text-sm font-medium text-slate-600 transition hover:bg-violet-50 hover:text-violet-700"
+              >
+                优化讲稿
+              </button>
+            </div>
+            <button
+              type="submit"
+              disabled={!connected || !input.trim()}
+              className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+            >
+              生成演示
+              <SendHorizonal className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </form>
     </div>
   );
 }
 
-/* ──────────────────────────────────────────────
- * WelcomeView — 欢迎空白页
- * ────────────────────────────────────────────── */
-function WelcomeView({ onQuickSelect }: { onQuickSelect: (text: string) => void }) {
+function WelcomeView({
+  onQuickSelect,
+  onCreateConversation,
+  hasActiveConversation,
+}: {
+  onQuickSelect: (text: string) => void;
+  onCreateConversation: (title?: string) => void;
+  hasActiveConversation: boolean;
+}) {
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center px-6">
-      {/* 发光圆环包裹的图标 */}
-      <div className="relative">
-        <div className="absolute inset-0 bg-blue-50/60 rounded-full blur-xl scale-150" />
-        <div className="relative p-4 rounded-full bg-blue-50/80 border border-blue-100/60">
-          <Database className="w-8 h-8 text-blue-500 animate-pulse" />
+    <div className="flex min-h-full flex-col justify-center px-2 py-6">
+      <div className="mx-auto w-full max-w-3xl">
+        <div className="rounded-[2rem] border border-blue-100 bg-gradient-to-br from-white to-blue-50 p-7 shadow-xl shadow-blue-100/40">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="absolute inset-0 scale-150 rounded-full bg-blue-200/50 blur-xl" />
+                <div className="relative rounded-2xl bg-blue-600 p-4 text-white shadow-lg shadow-blue-600/25">
+                  <Database className="h-7 w-7" />
+                </div>
+              </div>
+              <div>
+                <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
+                  先选一个教学任务
+                </h1>
+                <p className="mt-2 text-base leading-relaxed text-slate-500">
+                  选择模板后可以继续修改提示词，再生成完整演示。
+                </p>
+              </div>
+            </div>
+            {!hasActiveConversation && (
+              <button
+                onClick={() => onCreateConversation()}
+                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:bg-blue-700"
+              >
+                新建并保存对话
+              </button>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* 标题 */}
-      <h1 className="text-slate-900 text-2xl font-semibold tracking-tight mt-5">
-        DB Demo Studio
-      </h1>
-      <p className="text-slate-500 text-sm mt-1.5 max-w-md text-center leading-relaxed">
-        输入 SQL 查询或课程知识点，AI 将自动生成交互式数据库演示
-      </p>
-
-      {/* 快捷功能探查卡片 */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-8 w-full max-w-2xl">
-        {QUICK_CARDS.map((card) => (
-          <button
-            key={card.title}
-            onClick={() => onQuickSelect(card.title)}
-            className="group flex flex-col items-start p-4 bg-white rounded-xl border border-slate-100
-                       text-left cursor-pointer
-                       hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300
-                       transition-all duration-300"
-          >
-            <span className="text-lg">{card.icon}</span>
-            <span className="text-sm font-semibold text-slate-800 mt-2 group-hover:text-blue-600 transition-colors">
-              {card.title}
-            </span>
-            <span className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-              {card.desc}
-            </span>
-          </button>
-        ))}
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+          {QUICK_CARDS.map((card) => (
+            <button
+              key={card.title}
+              onClick={() => onQuickSelect(card.prompt)}
+              className="group flex min-h-44 flex-col items-start rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100"
+            >
+              <span className="rounded-xl bg-slate-950 px-2.5 py-1.5 font-mono text-[11px] font-semibold text-white">
+                {card.icon}
+              </span>
+              <span className="mt-4 text-base font-semibold text-slate-900 group-hover:text-blue-700">
+                {card.title}
+              </span>
+              <span className="mt-2 text-sm leading-relaxed text-slate-500">
+                {card.desc}
+              </span>
+              <span className="mt-auto pt-4 text-sm font-semibold text-blue-600">
+                填入提示词
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-/* ──────────────────────────────────────────────
- * MessageBubble — 消息气泡
- * ────────────────────────────────────────────── */
 function MessageBubble({ msg }: { msg: WsMessage }) {
   const payload = msg.payload as Record<string, unknown>;
+  const content =
+    typeof payload.content === "string"
+      ? payload.content
+      : typeof payload.message === "string"
+        ? payload.message
+        : "";
 
-  // ─── 用户消息：右对齐 ───
   if (msg.event === "chat:message") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[80%] bg-slate-100 text-slate-800 rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed">
-          <pre className="whitespace-pre-wrap font-sans">{JSON.stringify(payload, null, 2)}</pre>
+        <div className="max-w-[82%] rounded-3xl rounded-tr-md bg-blue-600 px-4 py-3 text-base leading-relaxed text-white shadow-lg shadow-blue-600/15">
+          <pre className="whitespace-pre-wrap font-sans">
+            {content || JSON.stringify(payload, null, 2)}
+          </pre>
         </div>
       </div>
     );
   }
 
-  // ─── 工具调用轨迹（agent:thinking） ───
   if (msg.event === "agent:thinking") {
-    const step = (payload as Record<string, unknown>)?.step as string;
-    const message = (payload as Record<string, unknown>)?.message as string;
+    const step = payload.step as string;
+    const message = payload.message as string;
     const toolLabel =
       step === "analyze"
-        ? "正在调用 sql_analyze 分析 SQL…"
-        : message || "正在调度 MCP 工具链…";
+        ? "正在调用 sql_analyze 分析 SQL..."
+        : message || "正在调度演示生成工具链...";
 
     return (
       <div className="flex gap-3">
-        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
-          <Sparkles className="w-3.5 h-3.5 text-white" />
+        <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 shadow-sm">
+          <Sparkles className="h-4 w-4 text-white" />
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="bg-blue-50/20 border border-blue-100/60 p-3 rounded-xl">
-            <div className="flex items-center gap-2.5 text-xs text-blue-700 font-medium">
-              <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+        <div className="min-w-0 flex-1">
+          <div className="rounded-3xl border border-blue-100 bg-blue-50 p-4">
+            <div className="flex items-center gap-2.5 text-sm font-medium text-blue-700">
+              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
               <span>{toolLabel}</span>
             </div>
-            {/* 进度条 */}
-            <div className="mt-2.5 h-1 rounded-full bg-slate-200/60 overflow-hidden">
-              <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-blue-400 to-indigo-400 animate-pulse" />
+            <div className="mt-3 h-1 rounded-full bg-blue-100">
+              <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 animate-pulse" />
             </div>
           </div>
         </div>
@@ -245,56 +334,69 @@ function MessageBubble({ msg }: { msg: WsMessage }) {
     );
   }
 
-  // ─── 其他事件（step:preview / demo:complete / 未知） ───
   const meta = EVENT_META[msg.event];
 
   return (
     <div className="flex gap-3">
-      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
-        <Sparkles className="w-3.5 h-3.5 text-white" />
+      <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 shadow-sm">
+        <Sparkles className="h-4 w-4 text-white" />
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         {meta && (
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className={`text-[11px] font-semibold ${meta.text}`}>{meta.label}</span>
+          <div className="mb-1.5 flex items-center gap-2">
+            <span
+              className={`inline-flex items-center gap-1 text-sm font-semibold ${meta.text}`}
+            >
+              {msg.event === "demo:complete" && <CheckCircle2 className="h-3 w-3" />}
+              {meta.label}
+            </span>
           </div>
         )}
         <div
-          className={`rounded-xl px-4 py-3 text-sm leading-relaxed border ${
+          className={`rounded-3xl border px-4 py-3 text-base leading-relaxed ${
             msg.event === "demo:complete" && payload.steps
-              ? "bg-emerald-50/50 border-emerald-200/60"
+              ? "border-emerald-200 bg-emerald-50"
               : meta
-              ? `${meta.bg} ${meta.border}`
-              : "bg-white border-slate-100 text-slate-900"
+                ? `${meta.bg} ${meta.border}`
+                : "border-slate-200 bg-white text-slate-900"
           }`}
         >
           {msg.event === "demo:complete" && payload.steps ? (
-            <div>
-              <p className="font-semibold text-slate-800 mb-2.5">
-                {(payload as DemoPayload).title}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {((payload as DemoPayload).steps || []).slice(0, 3).map((s, si) => (
-                  <span
-                    key={si}
-                    className="px-3 py-1 rounded-lg bg-white/70 border border-emerald-100 text-xs text-emerald-700 font-medium shadow-sm"
-                  >
-                    {s.index}. {s.title}
-                  </span>
-                ))}
-                {((payload as DemoPayload).steps || []).length > 3 && (
-                  <span className="px-3 py-1 text-xs text-slate-400">
-                    +{((payload as DemoPayload).steps || []).length - 3} 步
-                  </span>
-                )}
-              </div>
-            </div>
+            <DemoCompleteMessage payload={payload as DemoPayload} />
           ) : (
             <pre className="whitespace-pre-wrap font-sans text-slate-800">
               {JSON.stringify(payload, null, 2)}
             </pre>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function DemoCompleteMessage({ payload }: { payload: DemoPayload }) {
+  const steps = payload.steps || [];
+
+  return (
+    <div>
+      <p className="font-semibold text-slate-800">{payload.title || "演示已生成"}</p>
+      <p className="mt-1 text-sm text-emerald-700">
+        已生成 {steps.length} 个步骤，右侧控制台可查看和播放。
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {steps.slice(0, 4).map((step) => (
+          <span
+            key={step.index}
+            className="rounded-xl border border-emerald-100 bg-white px-3 py-1 text-sm font-medium text-emerald-700 shadow-sm"
+          >
+            {step.index}. {step.title}
+          </span>
+        ))}
+        {steps.length > 4 && (
+          <span className="px-2 py-1 text-xs text-slate-400">
+            +{steps.length - 4} 步
+          </span>
+        )}
       </div>
     </div>
   );

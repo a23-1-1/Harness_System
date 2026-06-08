@@ -1,335 +1,342 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Layers,
-  Play,
-  Sparkles,
+  Boxes,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
+  Film,
+  Layers,
+  PanelRightClose,
   PanelRightOpen,
+  Play,
+  Route,
+  Sparkles,
 } from "lucide-react";
-import type { DemoComplete } from "../../types";
+import type { DemoComplete, DemoStep } from "../../types";
 
 interface Props {
   demo: DemoComplete | null;
+  onCollapse?: () => void;
 }
 
-type Tab = "flow" | "execution" | "animation";
+type Tab = "flow" | "play" | "assets";
 
 const TABS: { key: Tab; label: string; icon: typeof Layers }[] = [
-  { key: "flow", label: "步骤编辑", icon: Layers },
-  { key: "execution", label: "执行播放", icon: Play },
-  { key: "animation", label: "动画引擎", icon: Sparkles },
+  { key: "flow", label: "流程", icon: Route },
+  { key: "play", label: "播放", icon: Play },
+  { key: "assets", label: "素材", icon: Boxes },
 ];
 
-const SIX_STAGES = [
-  { i: 1, key: "lex", label: "词法分析" },
-  { i: 2, key: "parse", label: "语法解析" },
-  { i: 3, key: "optimize", label: "查询优化" },
-  { i: 4, key: "plan", label: "执行计划" },
-  { i: 5, key: "execute", label: "执行过程" },
-  { i: 6, key: "result", label: "结果分析" },
-];
+const STAGE_LABELS = ["理解输入", "构造步骤", "生成画面", "同步讲解"];
 
-/* ─── 空状态（无演示时） ─── */
-function EmptyState() {
-  return (
-    <div className="flex flex-col h-full">
-      {/* Tab 栏占位 */}
-      <div className="border-b border-slate-200/60 bg-slate-50/80 backdrop-blur-sm p-2 flex items-center gap-1.5 rounded-t-2xl">
-        {TABS.map((t) => {
-          const Icon = t.icon;
-          return (
-            <span
-              key={t.key}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 text-slate-300 cursor-default"
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {t.label}
-            </span>
-          );
-        })}
-      </div>
-
-      {/* 网格主画布 */}
-      <div className="flex-1 bg-grid-pattern flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 px-8 text-center">
-          <div className="border border-dashed border-slate-300 p-4 rounded-xl">
-            <PanelRightOpen className="w-8 h-8 text-slate-300" />
-          </div>
-          <p className="text-sm font-medium text-slate-400">
-            等待演示内容
-          </p>
-          <p className="text-xs text-slate-300/70 leading-relaxed max-w-[200px]">
-            在中间对话区输入 SQL 或知识点
-            <br />
-            AI 生成的演示将在此处展示
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── 有演示数据 ─── */
-function ActiveView({
-  demo,
-  activeTab,
-  activeStage,
-  onTabChange,
-  onStageClick,
-}: {
-  demo: DemoComplete;
-  activeTab: Tab;
-  activeStage: number;
-  onTabChange: (t: Tab) => void;
-  onStageClick: (i: number) => void;
-}) {
-  return (
-    <div className="flex flex-col h-full">
-      {/* 顶部 Tab 导航 */}
-      <div className="border-b border-slate-200/60 bg-slate-50/80 backdrop-blur-sm p-2 flex items-center gap-1.5 rounded-t-2xl">
-        {TABS.map((t) => {
-          const Icon = t.icon;
-          const isActive = activeTab === t.key;
-          return (
-            <button
-              key={t.key}
-              onClick={() => onTabChange(t.key)}
-              className={`flex items-center gap-1.5 text-xs font-medium px-3.5 py-1.5 rounded-lg transition-all duration-150
-                ${
-                  isActive
-                    ? "bg-white text-slate-800 shadow-sm border border-slate-200/60"
-                    : "text-slate-400 hover:text-slate-600 px-3 py-1.5"
-                }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* 演示标题区 */}
-      <div className="px-4 py-3 border-b border-slate-100">
-        <h3 className="text-sm font-semibold text-slate-800 tracking-tight">
-          {demo.title}
-        </h3>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-[10px] font-mono text-slate-400">
-            {demo.demoId}
-          </span>
-          <span className="text-[10px] text-slate-300">·</span>
-          <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3" />
-            {demo.steps.length} 个阶段
-          </span>
-        </div>
-      </div>
-
-      {/* 网格主画布 */}
-      <div className="flex-1 overflow-y-auto bg-grid-pattern">
-        {activeTab === "flow" && (
-          <FlowEditor demo={demo} activeStage={activeStage} onStageClick={onStageClick} />
-        )}
-        {activeTab === "execution" && (
-          <ExecutionPlayer demo={demo} activeStage={activeStage} />
-        )}
-        {activeTab === "animation" && <AnimationEngine />}
-      </div>
-
-      {/* 底部状态 */}
-      <div className="px-4 py-2.5 border-t border-slate-200/60 bg-white flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[10px] text-slate-400">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          {demo.steps.length} 个步骤 · 演示就绪
-        </div>
-        <span className="text-[10px] font-mono text-slate-300">v1.0</span>
-      </div>
-    </div>
-  );
-}
-
-/* ─── 根组件 ─── */
-export default function DemoPreview({ demo }: Props) {
+export default function DemoPreview({ demo, onCollapse }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("flow");
-  const [activeStage, setActiveStage] = useState(1);
+  const [activeIndex, setActiveIndex] = useState(0);
 
-  if (!demo) return <EmptyState />;
+  useEffect(() => {
+    setActiveIndex(0);
+    setActiveTab("flow");
+  }, [demo?.demoId]);
+
+  const activeStep = demo?.steps[activeIndex] || null;
+  const progress = demo?.steps.length
+    ? Math.round(((activeIndex + 1) / demo.steps.length) * 100)
+    : 0;
+
+  const goPrev = () => setActiveIndex((i) => Math.max(0, i - 1));
+  const goNext = () =>
+    setActiveIndex((i) => Math.min((demo?.steps.length || 1) - 1, i + 1));
+
+  if (!demo) return <EmptyState onCollapse={onCollapse} />;
 
   return (
-    <ActiveView
-      demo={demo}
-      activeTab={activeTab}
-      activeStage={activeStage}
-      onTabChange={setActiveTab}
-      onStageClick={setActiveStage}
-    />
+    <div className="flex h-full flex-col bg-white text-slate-900">
+      <div className="border-b border-slate-200 bg-gradient-to-br from-blue-50 to-slate-50 p-3">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Preview
+            </p>
+            <p className="text-sm font-semibold text-slate-900">演示预览</p>
+          </div>
+          {onCollapse && (
+            <button
+              type="button"
+              onClick={onCollapse}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+              title="折叠右侧栏"
+            >
+              <PanelRightClose className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <div className="flex rounded-lg bg-white p-1 shadow-sm ring-1 ring-slate-200">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold transition ${
+                  active
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="border-b border-slate-200 bg-white p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-600">
+              Live Demo Console
+            </p>
+            <h2 className="mt-2 line-clamp-2 text-lg font-semibold tracking-tight">
+              {demo.title}
+            </h2>
+            <p className="mt-2 font-mono text-[10px] text-slate-500">{demo.demoId}</p>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Ready
+          </span>
+        </div>
+
+        <div className="mt-5">
+          <div className="flex items-center justify-between text-[11px] text-slate-500">
+            <span>
+              Step {activeIndex + 1}/{demo.steps.length}
+            </span>
+            <span>{progress}%</span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full bg-blue-600 transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="scroll-area min-h-0 flex-1 overflow-y-auto bg-slate-50">
+        {activeTab === "flow" && (
+          <FlowView
+            steps={demo.steps}
+            activeIndex={activeIndex}
+            onSelect={setActiveIndex}
+          />
+        )}
+        {activeTab === "play" && (
+          <PlayView step={activeStep} activeIndex={activeIndex} total={demo.steps.length} />
+        )}
+        {activeTab === "assets" && <AssetsView stepCount={demo.steps.length} />}
+      </div>
+
+      <div className="border-t border-slate-200 bg-white p-4">
+        <div className="flex items-center justify-between gap-3">
+          <button
+            onClick={goPrev}
+            disabled={activeIndex === 0}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+            上一步
+          </button>
+          <div className="flex items-center gap-1.5">
+            {demo.steps.map((step, index) => (
+              <button
+                key={step.index}
+                onClick={() => setActiveIndex(index)}
+                className={`h-2 rounded-full transition-all ${
+                  index === activeIndex
+                    ? "w-6 bg-blue-600"
+                    : index < activeIndex
+                      ? "w-2 bg-emerald-500"
+                      : "w-2 bg-slate-300"
+                }`}
+                aria-label={`跳转到第 ${index + 1} 步`}
+              />
+            ))}
+          </div>
+          <button
+            onClick={goNext}
+            disabled={activeIndex >= demo.steps.length - 1}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:opacity-100 disabled:shadow-none"
+          >
+            下一步
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
-/* ──────────────────────────────────────────────
- * FlowEditor — 步骤编辑视图
- * ────────────────────────────────────────────── */
-function FlowEditor({
-  demo,
-  activeStage,
-  onStageClick,
-}: {
-  demo: DemoComplete;
-  activeStage: number;
-  onStageClick: (i: number) => void;
-}) {
+function EmptyState({ onCollapse }: { onCollapse?: () => void }) {
   return (
-    <div className="p-4 space-y-4">
-      {/* 六阶段进度条 */}
-      <div className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm">
-        <div className="relative">
-          <div className="absolute top-3 left-4 right-4 h-0.5 bg-slate-100" />
-          <div className="flex justify-between relative">
-            {SIX_STAGES.map((s) => (
-              <button
-                key={s.key}
-                onClick={() => onStageClick(s.i)}
-                className="flex flex-col items-center gap-1.5 group"
+    <div className="flex h-full flex-col bg-white text-slate-900">
+      <div className="border-b border-slate-200 bg-gradient-to-br from-blue-50 to-slate-50 p-3">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Preview
+            </p>
+            <p className="text-sm font-semibold text-slate-900">演示预览</p>
+          </div>
+          {onCollapse && (
+            <button
+              type="button"
+              onClick={onCollapse}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+              title="折叠右侧栏"
+            >
+              <PanelRightClose className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-3 gap-1 rounded-lg bg-white p-1 shadow-sm ring-1 ring-slate-200">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <span
+                key={tab.key}
+                className="flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold text-slate-400"
               >
-                <span
-                  className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold border-2 transition-all duration-200
-                    ${
-                      activeStage >= s.i
-                        ? "bg-blue-600 border-blue-600 text-white shadow-sm"
-                        : "bg-white border-slate-200 text-slate-400 group-hover:border-slate-300"
-                    }`}
-                >
-                  {activeStage >= s.i ? (
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                  ) : (
-                    s.i
-                  )}
+                <Icon className="h-3.5 w-3.5" />
+                {tab.label}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex flex-1 items-center justify-center bg-slate-50 p-8">
+        <div className="max-w-xs text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white">
+            <PanelRightOpen className="h-8 w-8 text-slate-500" />
+          </div>
+          <h3 className="mt-5 text-base font-semibold">等待生成演示</h3>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500">
+            中间输入教学目标后，这里会显示流程、播放控制和演示素材。
+          </p>
+          <div className="mt-6 grid grid-cols-2 gap-2 text-left">
+            {STAGE_LABELS.map((label, index) => (
+              <div key={label} className="rounded-lg border border-slate-200 bg-white p-3">
+                <span className="font-mono text-[10px] text-blue-600">
+                  0{index + 1}
                 </span>
-                <span
-                  className={`text-[9px] font-medium whitespace-nowrap transition-colors ${
-                    activeStage >= s.i ? "text-blue-600" : "text-slate-400"
-                  }`}
-                >
-                  {s.label}
-                </span>
-              </button>
+                <p className="mt-1 text-xs font-medium text-slate-600">{label}</p>
+              </div>
             ))}
           </div>
         </div>
       </div>
-
-      {/* 步骤详解卡片列表 */}
-      {demo.steps.map((step) => (
-        <div
-          key={step.index}
-          onClick={() => onStageClick(step.index)}
-          className={`group p-4 rounded-xl border cursor-pointer transition-all duration-200
-            ${
-              activeStage === step.index
-                ? "bg-white border-blue-200 shadow-sm"
-                : "bg-white border-slate-100 hover:border-slate-200 hover:shadow-sm"
-            }`}
-        >
-          <div className="flex items-start gap-3">
-            <span
-              className={`flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold flex-shrink-0 transition-colors
-                ${
-                  activeStage === step.index
-                    ? "bg-blue-600 text-white"
-                    : "bg-slate-100 text-slate-500"
-                }`}
-            >
-              {step.index}
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <h4
-                  className={`text-sm font-semibold ${
-                    activeStage === step.index ? "text-blue-600" : "text-slate-800"
-                  }`}
-                >
-                  {step.title}
-                </h4>
-                {activeStage === step.index && (
-                  <ChevronRight className="w-3.5 h-3.5 text-blue-400" />
-                )}
-              </div>
-              <p className="text-xs text-slate-500 leading-relaxed mt-1">
-                {step.content}
-              </p>
-            </div>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
 
-/* ──────────────────────────────────────────────
- * ExecutionPlayer — 执行播放视图
- * ────────────────────────────────────────────── */
-function ExecutionPlayer({
-  demo,
-  activeStage,
+function FlowView({
+  steps,
+  activeIndex,
+  onSelect,
 }: {
-  demo: DemoComplete;
-  activeStage: number;
+  steps: DemoStep[];
+  activeIndex: number;
+  onSelect: (index: number) => void;
 }) {
   return (
-    <div className="p-4 space-y-4">
-      {/* 双会话分屏 */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-xl border border-slate-100 p-3 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="w-2 h-2 rounded-full bg-blue-500" />
-            <span className="text-[11px] font-semibold text-slate-700">会话 A</span>
-          </div>
-          <div className="space-y-1.5 font-mono text-[11px] leading-relaxed">
-            <p className="text-emerald-600 font-medium">BEGIN;</p>
-            <p className="text-slate-700">SELECT * FROM students;</p>
-            <p className="text-amber-500">-- 等待 UPDATE…</p>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-100 p-3 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="w-2 h-2 rounded-full bg-purple-500" />
-            <span className="text-[11px] font-semibold text-slate-700">会话 B</span>
-          </div>
-          <div className="space-y-1.5 font-mono text-[11px] leading-relaxed">
-            <p className="text-emerald-600 font-medium">BEGIN;</p>
-            <p className="text-slate-700">UPDATE students SET …</p>
-            <p className="text-amber-500">-- 等待锁释放…</p>
-          </div>
-        </div>
-      </div>
-
-      {/* 时间线滑块 */}
-      <div className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-[11px] font-semibold text-slate-500">操作时间线</span>
-          <span className="text-[10px] text-slate-400 font-mono">
-            T{activeStage}/{demo.steps.length}
-          </span>
-        </div>
-        <input
-          type="range"
-          min={1}
-          max={demo.steps.length}
-          value={activeStage}
-          className="w-full appearance-none h-1.5 rounded-full bg-slate-200 accent-blue-600 outline-none"
-          readOnly
-        />
-        <div className="flex justify-between mt-2">
-          {demo.steps.map((s) => (
+    <div className="space-y-3 p-4">
+      {steps.map((step, index) => {
+        const active = index === activeIndex;
+        const done = index < activeIndex;
+        return (
+          <button
+            key={step.index}
+            onClick={() => onSelect(index)}
+            className={`group flex w-full gap-3 rounded-lg border p-4 text-left transition ${
+              active
+                ? "border-blue-200 bg-blue-50 shadow-sm"
+                : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/40"
+            }`}
+          >
             <span
-              key={s.index}
-              className={`text-[9px] font-mono ${
-                s.index <= activeStage ? "text-blue-500" : "text-slate-300"
+              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-2xl text-xs font-bold ${
+                active
+                  ? "bg-blue-600 text-white"
+                  : done
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-slate-100 text-slate-500"
               }`}
             >
-              T{s.index}
+              {done ? <CheckCircle2 className="h-4 w-4" /> : step.index}
             </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-slate-900">{step.title}</span>
+              <span className="mt-1 line-clamp-2 block text-xs leading-relaxed text-slate-500">
+                {step.content}
+              </span>
+            </span>
+            {active && <ChevronRight className="mt-1 h-4 w-4 text-blue-600" />}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PlayView({
+  step,
+  activeIndex,
+  total,
+}: {
+  step: DemoStep | null;
+  activeIndex: number;
+  total: number;
+}) {
+  const codeLines = useMemo(
+    () => [
+      "BEGIN;",
+      "EXPLAIN ANALYZE SELECT ...;",
+      "-- visualize operator / lock / index state",
+      "COMMIT;",
+    ],
+    [],
+  );
+
+  return (
+    <div className="space-y-4 p-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
+            <Film className="h-3.5 w-3.5" />
+            播放帧 {activeIndex + 1}/{total}
+          </span>
+          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+        </div>
+        <h3 className="mt-4 text-lg font-semibold">{step?.title || "暂无步骤"}</h3>
+        <p className="mt-2 text-sm leading-relaxed text-slate-600">
+          {step?.content || "生成演示后会显示当前播放帧的讲解内容。"}
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-xs font-semibold text-slate-700">执行片段</span>
+          <span className="font-mono text-[10px] text-slate-500">SQL Runtime</span>
+        </div>
+        <div className="space-y-2 font-mono text-xs">
+          {codeLines.map((line, index) => (
+            <p key={line} className={index === activeIndex % 4 ? "text-blue-700" : "text-slate-500"}>
+              <span className="mr-3 text-slate-300">{index + 1}</span>
+              {line}
+            </p>
           ))}
         </div>
       </div>
@@ -337,22 +344,29 @@ function ExecutionPlayer({
   );
 }
 
-/* ──────────────────────────────────────────────
- * AnimationEngine — 动画引擎视图
- * ────────────────────────────────────────────── */
-function AnimationEngine() {
+function AssetsView({ stepCount }: { stepCount: number }) {
+  const assets = [
+    { label: "流程节点", value: `${stepCount}` },
+    { label: "讲解卡片", value: `${Math.max(stepCount, 1) * 2}` },
+    { label: "动画状态", value: "Ready" },
+    { label: "课堂问题", value: "Auto" },
+  ];
+
   return (
-    <div className="p-4">
-      <div className="bg-white rounded-xl border border-slate-100 p-8 flex flex-col items-center gap-4 shadow-sm">
-        <div className="relative w-20 h-20">
-          <div className="absolute inset-0 rounded-full border-2 border-slate-100" />
-          <Sparkles className="absolute inset-0 m-auto w-8 h-8 text-slate-300 animate-pulse" />
+    <div className="grid grid-cols-2 gap-3 p-4">
+      {assets.map((asset) => (
+        <div key={asset.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-[11px] text-slate-500">{asset.label}</p>
+          <p className="mt-2 text-lg font-semibold text-slate-900">{asset.value}</p>
         </div>
-        <p className="text-sm font-semibold text-slate-700">动画引擎就绪</p>
-        <p className="text-xs text-slate-400 text-center leading-relaxed max-w-[200px]">
-          B+ 树 · 事务隔离 · SQL 执行模拟器
-          <br />
-          在对话中发送指令即可生成动画演示
+      ))}
+      <div className="col-span-2 rounded-xl border border-blue-200 bg-blue-50 p-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-blue-700">
+          <Sparkles className="h-4 w-4" />
+          演示资源已准备
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-blue-700/80">
+          可继续在中间输入修改指令，例如“增加课堂提问”“把动画放慢”“改成事务隔离案例”。
         </p>
       </div>
     </div>
