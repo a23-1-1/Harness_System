@@ -5,10 +5,12 @@ DB Demo Studio — Orchestrator Agent
 """
 import logging
 from typing import Optional
+from sqlalchemy import select
 
 from app.llm.gateway import llm_gateway
 from app.database import async_session_factory
-from app.models.conversation import Message
+from app.models.conversation import Conversation, Message
+from app.redis_cache import redis_cache
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +27,11 @@ class OrchestratorAgent:
     """Orchestrator Agent —— 编排 AI 协作流程"""
 
     async def process_message(self, websocket, ws_manager, conv_id: str, payload: dict):
-        """处理用户消息：保存 → 分析 → 生成 → 推送"""
-        from app.ws.manager import ConnectionManager
-
+        """处理用户消息：保存 → 缓存 → 分析 → 生成 → 推送"""
         msg_type = payload.get("type", "text")
         content = payload.get("content", "")
 
-        # 1. 保存用户消息到 PostgreSQL
+        # 1. 保存用户消息到 PostgreSQL + 更新计数器
         async with async_session_factory() as db:
             msg = Message(
                 conv_id=conv_id,
@@ -40,32 +40,43 @@ class OrchestratorAgent:
                 content={"text": content} if msg_type == "text" else payload,
             )
             db.add(msg)
+            # 更新对话 message_count
+            result = await db.execute(select(Conversation).where(Conversation.id == conv_id))
+            conv = result.scalar_one_or_none()
+            if conv:
+                conv.message_count += 1
             await db.commit()
 
         logger.info("消息已持久化", extra={"data": {"convId": conv_id, "msgId": msg.id, "type": msg_type}})
 
-        # 2. 推送 step:preview — 确认收到
+        # 2. 写入 Redis 消息缓存
+        await redis_cache.push_message(conv_id, {
+            "id": msg.id,
+            "role": "user",
+            "type": msg_type,
+            "content": {"text": content} if msg_type == "text" else payload,
+        })
+
+        # 3. 推送 step:preview — 确认收到
         await ws_manager.send_personal(websocket, "step:preview", {
             "stepIndex": 0,
             "content": f"收到消息: {content[:50]}...",
             "type": msg_type,
         })
 
-        # 3. 推送 agent:thinking — 正在分析
+        # 4. 推送 agent:thinking — 正在分析
         await ws_manager.send_personal(websocket, "agent:thinking", {
             "step": "analyze",
             "message": "正在调用 sql_analyze 分析 SQL…",
         })
 
-        # 4. 调用 LLM Gateway 生成演示
+        # 5. 调用 LLM Gateway 生成演示
         try:
-            # 加载教师 Profile（TODO: feat-009 实现 PG 持久化 Profile）
             teacher_profile = None
-
             result = await llm_gateway.generate_demo(content, conv_id, teacher_profile)
             steps = result.get("steps", [])
 
-            # 5. 推送每个步骤的预览
+            # 6. 推送每个步骤的预览
             for step in steps:
                 await ws_manager.send_personal(websocket, "step:preview", {
                     "stepIndex": step.get("index", 0),
@@ -73,7 +84,7 @@ class OrchestratorAgent:
                     "title": step.get("title", ""),
                 })
 
-            # 6. 推送 demo:complete — 演示就绪
+            # 7. 推送 demo:complete — 演示就绪
             await ws_manager.send_personal(websocket, "demo:complete", {
                 "demoId": f"demo_{conv_id}",
                 "title": f"演示: {content[:30]}",
@@ -91,7 +102,7 @@ class OrchestratorAgent:
             })
 
     async def identify_intent(self, user_input: str) -> str:
-        """识别用户意图（当前为关键词匹配，后续可接入小模型）"""
+        """识别用户意图（关键词匹配）"""
         input_lower = user_input.lower()
         if "select" in input_lower or "join" in input_lower or "sql" in input_lower:
             return "sql_query"

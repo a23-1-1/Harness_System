@@ -16,17 +16,17 @@ from app.redis_cache import redis_cache
 logger = logging.getLogger(__name__)
 
 # ─── 配置 ────────────────────────────────────────────────────
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "siliconflow")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "deepseek")
 
-# SiliconFlow（默认，国内可直连，兼容 DeepSeek 模型）
+# SiliconFlow（备选，国内可直连）
 SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY", "")
 SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1"
 SILICONFLOW_MODEL = os.getenv("LLM_MODEL", "deepseek-ai/DeepSeek-V3-0324")
 
-# DeepSeek 官方（备选）
+# DeepSeek 官方（默认）
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
-DEEPSEEK_MODEL = "deepseek-chat"
+DEEPSEEK_MODEL = os.getenv("LLM_MODEL", "deepseek-chat")
 
 # 系统 Prompt
 SYSTEM_PROMPT = """你是一个数据库课程教学助手——DB Demo Studio 的 AI 核心。
@@ -136,14 +136,18 @@ class LLMGateway:
 
     async def chat(self, messages: list[dict]) -> str:
         """通用对话接口（用于后续 Agent 对话）"""
-        client = self._get_client()
-        response = await client.chat.completions.create(
-            model=self._get_model(),
-            messages=messages,
-            temperature=0.7,
-            max_tokens=4096,
-        )
-        return response.choices[0].message.content or ""
+        try:
+            client = self._get_client()
+            response = await client.chat.completions.create(
+                model=self._get_model(),
+                messages=messages,
+                temperature=0.7,
+                max_tokens=4096,
+            )
+            return response.choices[0].message.content or ""
+        except Exception as e:
+            logger.error(f"chat() 调用失败: {e}")
+            return ""
 
     def _cache_key(self, messages: list[dict]) -> str:
         """生成缓存 key"""
