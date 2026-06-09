@@ -94,7 +94,41 @@ SQL 查询的 6 阶段按以下对应生成默认 Mermaid 图：
 如果用户没有明确要求可视化，选择 1-2 个最关键的阶段添加 mermaid 字段（无需每个阶段都有）。
 
 当用户输入的是数据库概念（非 SQL）时，按知识点教学逻辑分 3-6 步讲解，每步的 stage 使用教学阶段名称（如 concept、example、summary 等）。
+
+## P2 专业模拟器输出格式
+
+当用户要求「模拟」「动画」「演示过程」「建模拟器」「B+树」「事务」「隔离级别」「幻读」等关键词时，生成 P2 模拟器类型演示。此时 type 设为 simulator，steps 中每步包含 simConfig 字段：
+
+```json
+{
+  "title": "B+树插入演示",
+  "demo_type": "simulator",
+  "simulator_type": "bplus_tree",
+  "simulator_config": {
+    "operation": "insert",
+    "key": 42,
+    "order": 4
+  },
+  "steps": [
+    {
+      "index": 1,
+      "stage": "setup",
+      "title": "查找插入位置",
+      "content": "从根节点开始查找键 42 应插入的叶子节点...",
+      "simConfig": {
+        "type": "bplus_tree",
+        "action": "traverse",
+        "nodes": [...]
+      }
+    }
+  ]
+}
 ```
+
+模拟器类型与配置：
+- bplus_tree: {operation: insert|delete|search, key: number, order: number}
+- transaction: {isolation_level: string, scenario: phantom_read|dirty_read|non_repeatable_read|lock_wait}
+- sql_execution: {sql: string, join_type: string, tables: [{name, rows}]}
 
 ## 教学风格要求
 

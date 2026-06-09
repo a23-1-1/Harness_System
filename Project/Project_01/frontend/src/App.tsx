@@ -52,11 +52,26 @@ export default function App() {
     return false;
   }, [wsMessages]);
 
+  // demo:complete → 仅在最近没有 demo:updated 时才设置 lastDemo
+  // 防止 demo:complete 覆盖模拟器参数调整的结果（#1）
+  const hasNewerUpdated = useMemo(() => {
+    return wsMessages.some(
+      (m) => m.event === "demo:updated" && wsMessages.indexOf(m) > (wsMessages.indexOf(latestDemoMsg as any) || -1)
+    );
+  }, [wsMessages, latestDemoMsg]);
+
   useEffect(() => {
-    if (latestDemoMsg) {
+    if (latestDemoMsg && !hasNewerUpdated) {
       setLastDemo(latestDemoMsg.payload as unknown as DemoComplete);
     }
-  }, [latestDemoMsg]);
+  }, [latestDemoMsg, hasNewerUpdated]);
+
+  // demo:updated → 替换 lastDemo（模拟器参数调整后更新，不持久化）
+  useEffect(() => {
+    const last = wsMessages.length > 0 ? wsMessages[wsMessages.length - 1] : null;
+    if (!last || last.event !== "demo:updated") return;
+    setLastDemo(last.payload as unknown as DemoComplete);
+  }, [wsMessages]);
 
   // step:regenerated → 原地更新 lastDemo 中对应步骤的内容
   useEffect(() => {
@@ -197,7 +212,7 @@ export default function App() {
                   onToggle={() => setRightCollapsed(false)}
                 />
               ) : (
-                <DemoPreview demo={lastDemo} onCollapse={() => setRightCollapsed(true)} onExport={() => send("demo:export", { format: "html" })} onRegenerate={(stepIndex, instructions) => send("step:regenerate", { stepIndex, instructions })} />
+                <DemoPreview demo={lastDemo} onCollapse={() => setRightCollapsed(true)} onExport={() => send("demo:export", { format: "html" })} onRegenerate={(stepIndex, instructions) => send("step:regenerate", { stepIndex, instructions })} onSimulatorUpdate={(simulatorType, params) => send("simulator:update", { simulator_type: simulatorType, params })} />
               )}
             </div>
           </div>

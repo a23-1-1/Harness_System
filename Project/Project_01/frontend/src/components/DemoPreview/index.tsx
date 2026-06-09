@@ -35,33 +35,41 @@ function getMermaid() {
   return mermaidPromise;
 }
 
+import SimulatorPreview from "./SimulatorPreview";
+
 interface Props {
   demo: DemoComplete | null;
   onCollapse?: () => void;
   onExport?: () => void;
   onRegenerate?: (stepIndex: number, instructions: string) => void;
+  onSimulatorUpdate?: (simulatorType: string, params: Record<string, unknown>) => void;
 }
 
-type Tab = "flow" | "play" | "assets";
+type Tab = "flow" | "play" | "assets" | "simulator";
 
 const TABS: { key: Tab; label: string; icon: typeof Layers }[] = [
   { key: "flow", label: "流程", icon: Route },
   { key: "play", label: "播放", icon: Play },
+  { key: "simulator", label: "模拟", icon: Layers },
   { key: "assets", label: "素材", icon: Boxes },
 ];
 
 const STAGE_LABELS = ["词法分析", "语法解析", "查询优化", "执行计划", "执行过程", "结果分析"];
 const STAGE_KEYS = ["lex", "parse", "optimize", "plan", "execute", "result"];
 
-export default function DemoPreview({ demo, onCollapse, onExport, onRegenerate }: Props) {
+export default function DemoPreview({ demo, onCollapse, onExport, onRegenerate, onSimulatorUpdate }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("flow");
   const [activeIndex, setActiveIndex] = useState(0);
   const [autoPlay, setAutoPlay] = useState(false);
   const autoPlayRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showExportNotif, setShowExportNotif] = useState(false);
 
-  // 重置状态当 demo 变化时
+  // 重置状态当 demo ID 变化时（跳过模拟器参数调整个 demoId=undefined 的情况）
+  const prevDemoIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
+    const currentId = demo?.demoId;
+    if (!currentId && prevDemoIdRef.current) return; // demo:updated → 不重置
+    prevDemoIdRef.current = currentId;
     setActiveIndex(0);
     setActiveTab("flow");
     setAutoPlay(false);
@@ -223,6 +231,9 @@ export default function DemoPreview({ demo, onCollapse, onExport, onRegenerate }
         )}
         {activeTab === "play" && (
           <PlayView step={activeStep} activeIndex={activeIndex} total={demo.steps.length} />
+        )}
+        {activeTab === "simulator" && (
+          <SimulatorPreview demo={demo} onSimulatorUpdate={onSimulatorUpdate} />
         )}
         {activeTab === "assets" && <AssetsView stepCount={demo.steps.length} />}
       </div>

@@ -20,6 +20,7 @@ from app.redis_cache import redis_cache
 from app.mcp.registry import mcp_registry
 from app.mcp.servers.sql_analyze import analyze_sql
 from app.mcp.servers.mermaid_gen import generate_mermaid
+from app.mcp.servers.simulator_engine import simulate_bplus_tree, simulate_transaction, simulate_sql_execution, simulate_sql_strategy_compare
 
 logger = logging.getLogger(__name__)
 
@@ -64,15 +65,19 @@ class OrchestratorAgent:
 
         try:
             # 1. 保存用户消息到 PostgreSQL + 更新计数器
-            msg_id = await self._save_user_message(conv_id, msg_type, content)
-
-            # 2. 写入 Redis 消息缓存
-            await redis_cache.push_message(conv_id, {
-                "id": msg_id,
-                "role": "user",
-                "type": msg_type,
-                "content": {"text": content} if msg_type == "text" else payload,
-            })
+            # 如果 PG/Redis 不可用，生成匿名 msg_id 继续执行（降级模式）
+            try:
+                msg_id = await self._save_user_message(conv_id, msg_type, content)
+                await redis_cache.push_message(conv_id, {
+                    "id": msg_id,
+                    "role": "user",
+                    "type": msg_type,
+                    "content": {"text": content} if msg_type == "text" else payload,
+                })
+            except Exception as e:
+                logger.warning(f"消息持久化失败（以降级模式继续）: {e}")
+                import uuid
+                msg_id = f"msg_{uuid.uuid4().hex[:12]}"
 
             # 3. 推送 agent:thinking — 正在分析
             await ws_manager.send_personal(websocket, "agent:thinking", {
@@ -86,7 +91,52 @@ class OrchestratorAgent:
                 sql_analysis = analyze_sql(content)
                 logger.info("SQL 分析完成", extra={"data": {"convId": conv_id, "tables": len(sql_analysis.get("tables", []))}})
 
-            # 5. 调用 LLM Gateway 生成演示（传入分析结果作为上下文）
+            # 5. 模拟器意图检测：B+树/事务/SQL 执行
+            sim_intent = self._detect_simulator_intent(content)
+            if sim_intent:
+                logger.info("检测到模拟器意图", extra={"data": {"convId": conv_id, "simType": sim_intent["type"]}})
+                await ws_manager.send_personal(websocket, "agent:thinking", {
+                    "step": "simulator",
+                    "message": f"正在构建 {sim_intent['label']}…",
+                })
+                try:
+                    if sim_intent["type"] == "bplus_tree":
+                        result = simulate_bplus_tree(
+                            operation=sim_intent.get("operation", "insert"),
+                            key=sim_intent.get("key", 42),
+                        )
+                    elif sim_intent["type"] == "transaction":
+                        result = simulate_transaction(
+                            isolation_level=sim_intent.get("isolation_level", "READ COMMITTED"),
+                            scenario=sim_intent.get("scenario", "phantom_read"),
+                        )
+                    elif sim_intent["type"] == "sql_execution":
+                        sql = content if self._looks_like_sql(content) else "SELECT * FROM t1 JOIN t2 ON ..."
+                        result = simulate_sql_execution(
+                            sql=sql,
+                            join_type=sim_intent.get("join_type", "Nested Loop Join"),
+                            tables=sim_intent.get("tables", [{"name": "t1", "rows": 100}, {"name": "t2", "rows": 500}]),
+                        )
+                    elif sim_intent["type"] == "strategy_compare":
+                        result = simulate_sql_strategy_compare(
+                            sql=content if self._looks_like_sql(content) else "",
+                            tables=[{"name": "students", "rows": 100}, {"name": "scores", "rows": 500}],
+                        )
+                    else:
+                        result = None
+
+                    if result:
+                        steps = result.get("steps", [])
+                        result["title"] = result.get("title", sim_intent["label"])
+                        # 跳过 LLM 调用，直接使用模拟器数据
+                        # 跳到第 7 步（推送 step:preview）
+                        await self._send_simulator_result(websocket, ws_manager, conv_id, msg_id, result, steps, content)
+                        return
+                except Exception as e:
+                    logger.error(f"模拟器生成失败: {e}", extra={"data": {"convId": conv_id}})
+                    # 降级到 LLM 生成
+
+            # 5b. 调用 LLM Gateway 生成演示（传入分析结果作为上下文）
             try:
                 result = await llm_gateway.generate_demo(content, conv_id, sql_analysis=sql_analysis)
                 steps = result.get("steps", [])
@@ -195,6 +245,59 @@ class OrchestratorAgent:
             "step": "interrupted",
             "message": "生成已中断",
         })
+
+    async def update_simulator(self, websocket, ws_manager, conv_id: str, payload: dict):
+        """对话式参数调整 — 增量更新模拟器（simulator:update）
+
+        payload: { simulator_type, params: { ... } }
+        不重新生成 demo:complete，只推送 demo:updated 事件。
+        """
+        sim_type = payload.get("simulator_type", "")
+        params = payload.get("params", {})
+
+        logger.info("模拟器参数更新请求", extra={"data": {"convId": conv_id, "simType": sim_type, "params": params}})
+
+        try:
+            if sim_type == "bplus_tree":
+                result = simulate_bplus_tree(
+                    operation=params.get("operation", "insert"),
+                    key=params.get("key", 42),
+                    order=params.get("order", 4),
+                )
+            elif sim_type == "transaction":
+                result = simulate_transaction(
+                    isolation_level=params.get("isolation_level", "READ COMMITTED"),
+                    scenario=params.get("scenario", "phantom_read"),
+                )
+            elif sim_type == "sql_execution":
+                result = simulate_sql_execution(
+                    sql=params.get("sql", "SELECT ..."),
+                    join_type=params.get("join_type", "Nested Loop Join"),
+                    tables=params.get("tables", [{"name": "t1", "rows": 100}, {"name": "t2", "rows": 500}]),
+                )
+            else:
+                await ws_manager.send_personal(websocket, "error", {
+                    "code": "UNKNOWN_SIMULATOR",
+                    "message": f"不支持的模拟器类型: {sim_type}",
+                })
+                return
+
+            steps = result.get("steps", [])
+
+            # 推送 demo:updated（与 demo:complete 同结构但事件名不同）
+            await ws_manager.send_personal(websocket, "demo:updated", {
+                "title": result.get("title", "模拟器"),
+                "steps": steps,
+                "simulator_type": sim_type,
+                "simulator_config": {k: result[k] for k in ("operation", "key", "order", "isolation_level", "scenario", "join_type") if k in result},
+            })
+
+        except Exception as e:
+            logger.error(f"模拟器更新失败: {e}", extra={"data": {"convId": conv_id}})
+            await ws_manager.send_personal(websocket, "error", {
+                "code": "SIMULATOR_UPDATE_FAILED",
+                "message": f"模拟器参数更新失败: {str(e)[:100]}",
+            })
 
     async def regenerate_step(self, websocket, ws_manager, conv_id: str, payload: dict):
         """局部重写某一步骤（step:regenerate）"""
@@ -358,6 +461,63 @@ h1 {{ font-size:1.8rem; margin-bottom:8px; }}
         """检测输入是否像是 SQL 语句"""
         upper = text.strip().upper()
         return any(upper.startswith(kw) for kw in ("SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER", "WITH", "EXPLAIN", "SHOW"))
+
+    async def _send_simulator_result(self, websocket, ws_manager, conv_id, msg_id, result, steps, content):
+        """推送模拟器结果（跳过 LLM 调用）"""
+        title = result.get("title", "模拟器演示")
+        # 保存 demo_snapshot
+        demo_id = await self._save_demo_snapshot(conv_id, title, steps, msg_id)
+        await redis_cache.push_message(conv_id, {
+            "id": demo_id, "role": "assistant", "type": "demo_snapshot",
+            "content": {"title": title, "steps": steps},
+        })
+        # 推送 step:preview
+        for s in steps:
+            if self._check_interrupted(conv_id):
+                await self._notify_interrupted(ws_manager, websocket)
+                return
+            sim_config = s.get("simConfig", {})
+            await ws_manager.send_personal(websocket, "step:preview", {
+                "stepIndex": s.get("index", 0),
+                "title": s.get("title", ""),
+                "content": s.get("content", ""),
+                "stage": s.get("stage", "simulator"),
+                "simConfig": sim_config,
+            })
+        # 推送 demo:complete，携带 simulator_type 标记
+        await ws_manager.send_personal(websocket, "demo:complete", {
+            "demoId": demo_id,
+            "title": title,
+            "steps": steps,
+            "simulator_type": result.get("simulator_type", ""),
+            "simulator_config": {k: result[k] for k in ("operation", "key", "order", "isolation_level", "scenario", "join_type") if k in result},
+            "demo_type": "simulator",
+        })
+
+    @staticmethod
+    def _detect_simulator_intent(content: str) -> dict | None:
+        """检测用户是否要求启动模拟器"""
+        lower = content.lower()
+        if any(kw in lower for kw in ("策略对比", "join对比", "对比join", "对比策略", "nested loop vs", "hash join vs", "sort merge vs", "哪种join", "哪种连接")):
+            return {"type": "strategy_compare", "label": "JOIN 策略对比"}
+        # 也匹配 "对比 JOIN 策略" 等组合（关键词不连续的情况）
+        if "对比" in lower and ("join" in lower or "策略" in lower or "连接" in lower):
+            return {"type": "strategy_compare", "label": "JOIN 策略对比"}
+        if any(kw in lower for kw in ("b+树", "btree", "b-tree", "b 树", "b树插入", "b树删除")):
+            # 尝试提取 key 值
+            import re
+            nums = re.findall(r"\d+", content)
+            key = int(nums[0]) if nums else 42
+            op = "delete" if "删除" in lower else "search" if "查找" in lower or "搜索" in lower else "insert"
+            return {"type": "bplus_tree", "label": "B+树模拟器", "operation": op, "key": key}
+        if any(kw in lower for kw in ("隔离级别", "幻读", "脏读", "不可重复读", "rr级别", "rc级别", "事务模拟")):
+            scenario = "dirty_read" if "脏读" in lower else "non_repeatable_read" if "不可重复读" in lower else "phantom_read"
+            iso = "SERIALIZABLE" if "序列化" in lower or "可串行化" in lower else "REPEATABLE READ" if "rr" in lower else "READ COMMITTED" if "rc" in lower else "READ UNCOMMITTED" if "ru" in lower or "读未提交" in lower else "READ COMMITTED"
+            return {"type": "transaction", "label": "事务模拟器", "isolation_level": iso, "scenario": scenario}
+        if any(kw in lower for kw in ("模拟执行", "分步执行", "执行过程", "nested loop", "hash join", "sort merge", "join算法")):
+            join_type = "Hash Join" if "hash" in lower else "Sort Merge Join" if "sort" in lower or "merge" in lower else "Nested Loop Join"
+            return {"type": "sql_execution", "label": "SQL 执行模拟器", "join_type": join_type}
+        return None
 
     async def _save_user_message(self, conv_id: str, msg_type: str, content: str) -> str:
         """保存用户消息到 PG，返回消息 ID"""

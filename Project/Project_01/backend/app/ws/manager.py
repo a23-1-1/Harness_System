@@ -103,6 +103,12 @@ class ConnectionManager:
                         orchestrator.export_demo(websocket, self, conv_id, payload)
                     )
 
+                elif event == "simulator:update":
+                    from app.agents.orchestrator import orchestrator
+                    task = asyncio.create_task(
+                        orchestrator.update_simulator(websocket, self, conv_id, payload)
+                    )
+
                 elif event == "ping":
                     await self.send_personal(websocket, "pong", {"timestamp": payload.get("timestamp", "")})
 
