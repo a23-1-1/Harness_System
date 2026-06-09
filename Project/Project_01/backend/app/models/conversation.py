@@ -23,7 +23,7 @@ class Conversation(Base):
     """对话表"""
     __tablename__ = "conversations"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=_uuid)
     teacher_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(256), default="")
     status: Mapped[str] = mapped_column(
@@ -51,7 +51,7 @@ class Message(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: f"msg_{uuid.uuid4().hex[:12]}")
     conv_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True
+        String(64), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True
     )
     role: Mapped[str] = mapped_column(
         String(16), CheckConstraint("role IN ('user','assistant','system','agent')"), nullable=False,
@@ -73,7 +73,7 @@ class Demo(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: f"demo_{uuid.uuid4().hex[:12]}")
     conv_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+        String(64), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
     )
     version: Mapped[int] = mapped_column(Integer, default=1)
     snapshot_order: Mapped[int] = mapped_column(Integer, default=1)

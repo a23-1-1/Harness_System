@@ -73,23 +73,38 @@ class ConnectionManager:
 
                 if event == "chat:message":
                     from app.agents.orchestrator import orchestrator
+                    from app.ws.rooms import room_manager
+                    # 学生消息路由到私有对话 ID（AI 上下文隔离）
+                    info = await room_manager.get_connection_info(websocket)
+                    effective_conv_id = conv_id
+                    if info and info.get("role") == "student":
+                        effective_conv_id = room_manager.student_conv_id(
+                            conv_id, info.get("student_id", ""), info.get("teacher_id", ""),
+                        )
                     # 取消同一 conv 之前的未完成任务（精确打断，无需轮询）
-                    prev = self._active_tasks.get(conv_id)
+                    prev = self._active_tasks.get(effective_conv_id)
                     if prev and not prev.done():
                         prev.cancel()
                     task = asyncio.create_task(
-                        orchestrator.process_message(websocket, self, conv_id, payload)
+                        orchestrator.process_message(websocket, self, effective_conv_id, payload)
                     )
-                    self._active_tasks[conv_id] = task
-                    def _cleanup(t: asyncio.Task, cid=conv_id):
+                    self._active_tasks[effective_conv_id] = task
+                    def _cleanup(t: asyncio.Task, cid=effective_conv_id):
                         if self._active_tasks.get(cid) is t:
                             self._active_tasks.pop(cid, None)
                     task.add_done_callback(_cleanup)
 
                 elif event == "chat:interrupt":
                     from app.agents.orchestrator import orchestrator
-                    # 只设置 interrupt flag，不 cancel 任务——让 checkpoint 优雅退出
-                    orchestrator.interrupt(conv_id)
+                    from app.ws.rooms import room_manager
+                    # 学生打断路由到私有对话 ID
+                    info = await room_manager.get_connection_info(websocket)
+                    effective_conv_id = conv_id
+                    if info and info.get("role") == "student":
+                        effective_conv_id = room_manager.student_conv_id(
+                            conv_id, info.get("student_id", ""), info.get("teacher_id", ""),
+                        )
+                    orchestrator.interrupt(effective_conv_id)
 
                 elif event == "step:regenerate":
                     from app.agents.orchestrator import orchestrator
@@ -111,6 +126,33 @@ class ConnectionManager:
 
                 elif event == "ping":
                     await self.send_personal(websocket, "pong", {"timestamp": payload.get("timestamp", "")})
+
+                elif event == "player:seek":
+                    from app.ws.rooms import room_manager
+                    # 教师跳转步骤 → 通过 Room 广播给所有学生
+                    await room_manager.publish_teacher_action(conv_id, event, payload)
+
+                elif event == "room:members":
+                    from app.ws.rooms import room_manager
+                    members = await room_manager.get_members(conv_id)
+                    await self.send_personal(websocket, "room:members", {"members": members})
+
+                elif event == "room:member_count":
+                    from app.ws.rooms import room_manager
+                    count = await room_manager.get_member_count(conv_id)
+                    await self.send_personal(websocket, "room:member_count", count)
+
+                elif event == "quiz:generate":
+                    from app.agents.orchestrator import orchestrator
+                    task = asyncio.create_task(
+                        orchestrator.generate_quiz(websocket, self, conv_id, payload)
+                    )
+
+                elif event == "quiz:answer":
+                    from app.agents.orchestrator import orchestrator
+                    task = asyncio.create_task(
+                        orchestrator.answer_quiz(websocket, self, conv_id, payload)
+                    )
 
                 else:
                     logger.warning(f"unknown event: {event}")

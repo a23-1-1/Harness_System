@@ -12,6 +12,7 @@ import {
   Terminal,
 } from "lucide-react";
 import type { Conversation, WsMessage } from "../../types";
+import QuizCard from "./QuizCard";
 
 interface Props {
   messages: WsMessage[];
@@ -22,6 +23,7 @@ interface Props {
   onCreateConversation: (title?: string) => void;
   isGenerating?: boolean;
   onInterrupt?: () => void;
+  onQuizAnswer?: (questionId: string, answer: string, question: Record<string, unknown>) => void;
 }
 
 const QUICK_CARDS = [
@@ -87,6 +89,7 @@ export default function ChatPanel({
   onCreateConversation,
   isGenerating,
   onInterrupt,
+  onQuizAnswer,
 }: Props) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -368,13 +371,23 @@ function MessageBubble({ msg }: { msg: WsMessage }) {
           className={`rounded-3xl border px-4 py-3 text-base leading-relaxed ${
             msg.event === "demo:complete" && payload.steps
               ? "border-emerald-200 bg-emerald-50"
-              : meta
-                ? `${meta.bg} ${meta.border}`
-                : "border-slate-200 bg-white text-slate-900"
+              : msg.event === "quiz:generated"
+                ? "border-violet-200 bg-violet-50"
+                : msg.event === "quiz:result"
+                  ? payload.correct
+                    ? "border-emerald-200 bg-emerald-50"
+                    : "border-red-200 bg-red-50"
+                  : meta
+                    ? `${meta.bg} ${meta.border}`
+                    : "border-slate-200 bg-white text-slate-900"
           }`}
         >
           {msg.event === "demo:complete" && payload.steps ? (
             <DemoCompleteMessage payload={payload as DemoPayload} />
+          ) : msg.event === "quiz:generated" ? (
+            <QuizMessage payload={payload as Record<string, unknown>} onQuizAnswer={onQuizAnswer} />
+          ) : msg.event === "quiz:result" ? (
+            <QuizResultMessage payload={payload as Record<string, unknown>} />
           ) : (msg.event === "step:preview" || msg.event === "step:regenerated") && payload.title ? (
             <StepPreviewMessage event={msg.event} payload={payload as Record<string, unknown>} />
           ) : (
@@ -451,3 +464,47 @@ type DemoPayload = {
   title?: string;
   steps?: { index: number; title: string; content: string; stage?: string }[];
 };
+
+function QuizMessage({ payload, onQuizAnswer }: { payload: Record<string, unknown>; onQuizAnswer?: (questionId: string, answer: string, question: Record<string, unknown>) => void }) {
+  const questions = payload.questions as Array<Record<string, unknown>> || [];
+  const topic = payload.topic as string;
+
+  if (!questions.length) return null;
+
+  return (
+    <div>
+      <p className="mb-3 text-sm font-semibold text-violet-700">📝 测验</p>
+      <QuizCard
+        questions={questions.map((q) => ({
+          id: q.id as string,
+          type: q.type as "choice" | "true_false",
+          question: q.question as string,
+          options: q.options as string[],
+          correct: q.correct as string,
+          explanation: q.explanation as string,
+        }))}
+        topic={topic}
+        onAnswer={(questionId: string, answer: string, question) => {
+          onQuizAnswer?.(questionId, answer, question as unknown as Record<string, unknown>);
+        }}
+      />
+    </div>
+  );
+}
+
+function QuizResultMessage({ payload }: { payload: Record<string, unknown> }) {
+  const correct = payload.correct as boolean;
+  const explanation = payload.explanation as string;
+  const correctAnswer = payload.correctAnswer as string;
+
+  return (
+    <div>
+      <p className={`text-sm font-semibold ${correct ? "text-emerald-700" : "text-red-700"}`}>
+        {correct ? "✅ 回答正确！" : `❌ 回答错误（正确答案: ${correctAnswer}）`}
+      </p>
+      {explanation && (
+        <p className="mt-2 text-sm leading-relaxed text-slate-700">{explanation}</p>
+      )}
+    </div>
+  );
+}

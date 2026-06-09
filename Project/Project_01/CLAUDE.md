@@ -60,6 +60,7 @@ bash init.sh
 | `chat:interrupt` | 打断 AI 生成 |
 | `conv:create\|switch\|delete\|rename` | 对话管理 |
 | `step:regenerate` | 重生成单步 |
+| `quiz:generate` | AI 出题 |
 | `quiz:answer` | 提交答案 |
 | `player:seek` | 跳转到步骤 |
 | `demo:export` | 导出演示 |
@@ -72,6 +73,7 @@ bash init.sh
 | `agent:tool_call` | 工具调用状态 |
 | `step:preview` | 步骤预览 |
 | `demo:updated\|complete` | 演示更新/就绪 |
+| `quiz:generated` | 题目已生成 |
 | `quiz:result` | 答题结果 |
 | `conv:list\|loaded` | 对话列表/已加载 |
 

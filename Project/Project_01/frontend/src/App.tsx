@@ -95,6 +95,9 @@ export default function App() {
   const handleSend = (text: string) => {
     send("chat:message", { type: "text", content: text });
   };
+  const handleQuizAnswer = (questionId: string, answer: string, question: Record<string, unknown>) => {
+    send("quiz:answer", { questionId, answer, question, studentId: "local-student" });
+  };
   const handleCreateConv = async (title?: string) => {
     const conv = await create(title);
     setActiveConv(conv.id);
@@ -197,6 +200,7 @@ export default function App() {
                 onCreateConversation={handleCreateConv}
                 isGenerating={isGenerating}
                 onInterrupt={() => send("chat:interrupt", {})}
+                onQuizAnswer={handleQuizAnswer}
               />
             </div>
           </div>

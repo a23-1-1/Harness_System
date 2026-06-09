@@ -9,6 +9,7 @@ import html
 import json
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import select
@@ -632,6 +633,281 @@ h1 {{ font-size:1.8rem; margin-bottom:8px; }}
         if "事务" in input_lower or "隔离" in input_lower or "幻读" in input_lower:
             return "transaction"
         return "knowledge_point"
+
+    # ─── 测验系统 ──────────────────────────────────────────
+
+    @staticmethod
+    def _normalize_quiz_questions(questions: list, expected_count: int, q_type: str, topic: str) -> list:
+        """后处理 LLM 输出题目：规范化格式、补全字段、修正类型、补齐数量"""
+        if not questions:
+            return []
+
+        normalized = []
+        actual_type = q_type
+        for i, q in enumerate(questions):
+            qid = q.get("id", f"q{i + 1}")
+            question_text = q.get("question", "")
+            if not question_text:
+                continue
+
+            # 强制类型匹配
+            if q.get("type") not in ("choice", "true_false"):
+                actual_type = q_type
+
+            # 规范化 correct 为单字母
+            correct_raw = str(q.get("correct", ""))
+            correct_letter = correct_raw.strip()[0].upper() if correct_raw else "A"
+
+            # 确保 options 格式正确
+            options = q.get("options", [])
+            if not options or not isinstance(options, list):
+                if actual_type == "choice":
+                    options = ["A. 选项A", "B. 选项B", "C. 选项C", "D. 选项D"]
+                else:
+                    options = ["T", "F"]
+
+            # 确保 explanation 存在
+            explanation = q.get("explanation", "") or f"此题考察 {topic or '当前知识点'}。正确答案是 {correct_letter}。"
+
+            normalized.append({
+                "id": qid,
+                "type": actual_type,
+                "question": question_text,
+                "options": options,
+                "correct": correct_letter,
+                "explanation": explanation,
+            })
+
+        # 补齐不足数量（LLM 可能不遵守 count 参数）
+        while len(normalized) < expected_count:
+            idx = len(normalized) + 1
+            if actual_type == "choice":
+                normalized.append({
+                    "id": f"q{idx}",
+                    "type": "choice",
+                    "question": f"关于 {topic or '当前知识点'}，以下说法正确的是？",
+                    "options": ["A. 说法一", "B. 说法二", "C. 说法三", "D. 说法四"],
+                    "correct": "A",
+                    "explanation": f"此题考察 {topic or '当前知识点'}。正确答案是 A。",
+                })
+            else:
+                normalized.append({
+                    "id": f"q{idx}",
+                    "type": "true_false",
+                    "question": f"关于 {topic or '当前知识点'}，以下说法是否正确？",
+                    "options": ["T", "F"],
+                    "correct": "T",
+                    "explanation": f"此题考察 {topic or '当前知识点'}。正确答案是 正确。",
+                })
+
+        return normalized[:expected_count]
+
+    async def generate_quiz(self, websocket, ws_manager, conv_id: str, payload: dict):
+        """AI 出题（quiz:generate）
+
+        payload: {
+            count: 3,           # 题目数量
+            type: "choice",     # choice | true_false
+            topic: "JOIN 查询"   # 知识点/步骤描述（可选）
+        }
+        """
+        count = payload.get("count", 3)
+        q_type = payload.get("type", "choice")
+        topic = payload.get("topic", "")
+
+        # 参数校验
+        if not isinstance(count, int) or count < 1 or count > 10:
+            count = 3
+        if q_type not in ("choice", "true_false"):
+            q_type = "choice"
+
+        # 尝试从最新演示快照获取步骤作为上下文
+        context = ""
+        try:
+            async with async_session_factory() as db:
+                result = await db.execute(
+                    select(Message)
+                    .where(Message.conv_id == conv_id, Message.type == "demo_snapshot")
+                    .order_by(Message.created_at.desc())
+                    .limit(1)
+                )
+                snapshot_msg = result.scalar_one_or_none()
+                if snapshot_msg:
+                    steps = snapshot_msg.content.get("steps", [])
+                    context = "\n".join(
+                        f"步骤{s.get('index', i+1)} [{s.get('stage', '')}] {s.get('title', '')}: {s.get('content', '')[:100]}"
+                        for i, s in enumerate(steps)
+                    )
+        except Exception:
+            pass
+
+        await ws_manager.send_personal(websocket, "agent:thinking", {
+            "step": "quiz_generate",
+            "message": f"正在生成 {count} 道{q_type}题…",
+        })
+
+        prompt = f"""根据以下教学内容生成 {count} 道数据库课程{'选择题' if q_type == 'choice' else '判断题'}。
+
+知识点/主题: {topic or '当前演示内容'}
+
+教学上下文:
+{context[:1500] if context else '无具体上下文，根据主题出题'}
+
+要求：
+1. 题目覆盖该知识点的核心概念
+2. 每道题有明确正确的答案
+3. 选择题有 4 个选项，1 个正确答案
+4. 判断题标记 true/false
+5. 附带简要解析（为什么对/错）
+
+输出 JSON 格式：
+{{
+  "questions": [
+    {{
+      "id": "q1",
+      "type": "choice",
+      "question": "题目内容",
+      "options": ["A. 选项1", "B. 选项2", "C. 选项3", "D. 选项4"],
+      "correct": "A",
+      "explanation": "解析内容"
+    }}
+  ]
+}}
+直接输出 JSON，不要多余说明。"""
+
+        try:
+            result_text = await llm_gateway.chat_with_json(prompt)
+            result = json.loads(result_text)
+            questions = result.get("questions", [])
+        except Exception as e:
+            logger.error(f"quiz:generate LLM 调用失败: {e}")
+            questions = []
+
+        # 后处理：规范化 LLM 输出
+        questions = self._normalize_quiz_questions(questions, count, q_type, topic)
+
+        if not questions:
+            logger.warning(f"quiz:generate 未生成有效题目，降级处理: conv={conv_id}, topic={topic}")
+            # 降级：告知用户出题失败
+            await ws_manager.send_personal(websocket, "agent:thinking", {
+                "step": "warning",
+                "message": "出题失败，请稍后重试或换一个知识点。",
+            })
+            questions = [{
+                "id": "q1",
+                "type": "choice",
+                "question": "关于" + (topic or "当前知识点") + "，以下哪个描述是正确的？",
+                "options": ["A. 这是正确描述", "B. 这是错误描述", "C. 不确定", "D. 以上都不对"],
+                "correct": "A",
+                "explanation": "这是对基本概念的验证题。",
+            }]
+
+        await ws_manager.send_personal(websocket, "quiz:generated", {
+            "questions": questions,
+            "topic": topic,
+        })
+
+    async def answer_quiz(self, websocket, ws_manager, conv_id: str, payload: dict):
+        """学生答题 + AI 判题讲解（quiz:answer）
+
+        payload: {
+            questionId: "q1",
+            answer: "A",
+            question: {完整题目对象},
+            studentId: "stu001",
+            topic: "JOIN 查询",    # 知识点主题（可选）
+        }
+        """
+        question_id = payload.get("questionId", "")
+        student_answer = payload.get("answer", "")
+        question = payload.get("question", {})
+        student_id = payload.get("studentId", "")
+        topic = payload.get("topic", "")
+
+        correct_answer = question.get("correct", "")
+        # 标准化答案前缀比较：correct 可能是 "A" 或 "A. 选项文本"
+        correct_letter = correct_answer.strip()[0].upper() if correct_answer else ""
+        student_letter = student_answer.strip().upper() if student_answer else ""
+        is_correct = student_letter == correct_letter and bool(correct_letter)
+
+        # 用 LLM 生成个性化讲解
+        explanation = question.get("explanation", "")
+        if is_correct:
+            # 正确：简短肯定
+            teaching_reply = f"✅ 回答正确！{explanation}"
+            logger.info(f"Quiz correct: q={question_id}, student={student_id}")
+        else:
+            # 错误：AI 对话式引导
+            prompt = f"""学生回答了一道数据库题，答案错误。
+
+题目: {question.get('question', '')}
+正确答案: {correct_answer}
+学生答案: {student_answer}
+解析: {explanation}
+
+请用苏格拉底式引导方式，帮助学生理解正确思路。不要直接给答案，而是：
+1. 先肯定学生的思考
+2. 指出关键误区和为什么
+3. 引导学生重新思考
+输出简洁的 2-3 句话。"""
+            try:
+                teaching_reply = await llm_gateway.chat([{"role": "user", "content": prompt}])
+            except Exception:
+                teaching_reply = f"❌ 回答错误。正确答案是 {correct_answer}。{explanation}"
+
+            logger.info(f"Quiz wrong: q={question_id}, student={student_id}")
+
+        # 记录答题结果到 StudentProgress
+        if student_id:
+            try:
+                from app.database import async_session_factory
+                from app.models.student_progress import StudentProgress
+                from sqlalchemy import select
+                async with async_session_factory() as db:
+                    # 查找或创建学生的掌握度记录
+                    result = await db.execute(
+                        select(StudentProgress).where(
+                            StudentProgress.student_id == student_id,
+                            StudentProgress.teacher_id == conv_id.split(":")[0] if ":" in conv_id else "default",
+                        ).limit(1)
+                    )
+                    sp = result.scalar_one_or_none()
+                    if not sp:
+                        sp = StudentProgress(
+                            student_id=student_id,
+                            teacher_id=conv_id.split(":")[0] if ":" in conv_id else "default",
+                            subject=topic or question.get("question", "")[:50],
+                        )
+                        db.add(sp)
+                    sp.total_questions += 1
+                    if is_correct:
+                        sp.correct_answers += 1
+                    answers = list(sp.quiz_answers or [])
+                    answers.append({
+                        "questionId": question_id,
+                        "correct": is_correct,
+                        "studentAnswer": student_answer,
+                        "correctAnswer": correct_answer,
+                        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                    })
+                    sp.quiz_answers = answers[-200:]  # 保留最近 200 条
+                    # 更新掌握度（简单模型）
+                    mastery = dict(sp.mastery or {})
+                    topic = question.get("question", "")[:30]
+                    current = mastery.get(topic, 0.5)
+                    mastery[topic] = min(1.0, current + 0.1 if is_correct else max(0.0, current - 0.1))
+                    sp.mastery = mastery
+                    await db.commit()
+            except Exception as e:
+                logger.warning(f"学生进度记录失败: {e}")
+
+        await ws_manager.send_personal(websocket, "quiz:result", {
+            "questionId": question_id,
+            "correct": is_correct,
+            "correctAnswer": correct_answer,
+            "studentAnswer": student_answer,
+            "explanation": teaching_reply,
+        })
 
 
 # 全局单例

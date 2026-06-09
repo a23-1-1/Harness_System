@@ -19,8 +19,10 @@ if env_path.exists():
     load_dotenv(env_path)
 
 from app.ws.manager import ConnectionManager, ws_manager
+from app.ws.rooms import room_manager
 from app.database import init_db
 from app.redis_cache import redis_cache
+from app.mcp.servers import register_all_tools
 
 load_dotenv()
 
@@ -48,8 +50,8 @@ else:
 logger = logging.getLogger(__name__)
 
 
-# ─── 全局管理器 ──────────────────────────────────────────────
-ws_manager = ConnectionManager()
+# ─── ws_manager 使用 manager.py 的单例，避免重复创建 ──
+# ws_manager 已在 from app.ws.manager import ws_manager 时导入
 
 
 # ─── 生命周期 ────────────────────────────────────────────────
@@ -57,6 +59,12 @@ ws_manager = ConnectionManager()
 async def lifespan(app: FastAPI):
     """应用启动/关闭生命周期"""
     logger.info("🚀 DB Demo Studio 启动", extra={"data": {"status": "starting"}})
+    # 注册 MCP 工具
+    try:
+        register_all_tools()
+        logger.info("MCP 工具注册完成")
+    except Exception as e:
+        logger.warning(f"MCP 工具注册失败: {e}")
     # 自动创建数据库表（开发环境）
     try:
         await init_db()
@@ -68,7 +76,10 @@ async def lifespan(app: FastAPI):
         await redis_cache.get_client()
     except Exception as e:
         logger.warning(f"Redis 连接失败（若未启动 Docker 可忽略）: {e}")
+    # 启动 Room Pub/Sub 监听器
+    room_manager.start_listener()
     yield
+    await room_manager.stop_listener()
     await redis_cache.close()
     logger.info("🛑 DB Demo Studio 关闭", extra={"data": {"status": "stopping"}})
 
@@ -81,7 +92,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# CORS — WebSocket 不受此影响（WebSocket 握手不走 CORS 中间件）
 origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
@@ -95,6 +106,10 @@ app.add_middleware(
 # ─── 中间件：请求日志 ──────────────────────────────────────
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
+    from app.ws.manager import ws_manager
+    # 处理 WebSocket 升级请求（通过 ws_manager 确认）
+    if request.headers.get("upgrade", "").lower() == "websocket":
+        return await call_next(request)
     start = datetime.now(tz=timezone.utc)
     response = await call_next(request)
     duration = (datetime.now(tz=timezone.utc) - start).total_seconds() * 1000
@@ -112,10 +127,12 @@ async def log_requests(request: Request, call_next):
 
 # ─── 路由注册 ────────────────────────────────────────────────
 from app.routes import conversations  # noqa: E402
+from app.routes import students  # noqa: E402
 from app.ws import handlers  # noqa: E402
 
 app.include_router(conversations.router, prefix="/api/v5")
 app.include_router(handlers.router)
+app.include_router(students.router, prefix="/api/v5")
 
 
 # ─── 健康检查 ────────────────────────────────────────────────

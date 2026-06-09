@@ -33,9 +33,11 @@ class ConversationUpdate(BaseModel):
 # ─── API 端点 ────────────────────────────────────────────────
 @router.get("")
 async def list_conversations(db: AsyncSession = Depends(get_db)):
-    """获取对话列表（按更新时间倒序）"""
+    """获取对话列表（按更新时间倒序），过滤学生私有对话"""
     result = await db.execute(
-        select(Conversation).order_by(Conversation.updated_at.desc())
+        select(Conversation)
+        .where(~Conversation.id.like("%:student:%"))
+        .order_by(Conversation.updated_at.desc())
     )
     conversations = result.scalars().all()
     logger.info("获取对话列表", extra={"data": {"count": len(conversations)}})

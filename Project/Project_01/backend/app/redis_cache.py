@@ -45,6 +45,10 @@ class RedisCache:
             await self._client.aclose()
             self._client = None
 
+    def reset_client(self):
+        """重置客户端状态，下次 get_client 会重新连接"""
+        self._client = None
+
     # ─── 会话状态 ──────────────────────────────────────────
     async def set_session(self, conv_id: str, data: dict, ttl: int = 86400):
         """设置活跃对话状态"""

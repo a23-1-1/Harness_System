@@ -45,16 +45,16 @@
       "name": "对话式测验 & 教学闭环",
       "description": "AI 自动出题（选择题/判断题/简答，F4.1）；学生答题后 AI 讲解错误原因（F4.2）；掌握度分析 + 自适应建议（F4.3-F4.4）；嵌入式测验 UI 联动演示步骤",
       "dependencies": ["feat-005"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "done",
+      "evidence": "StudentProgress PG 模型 + REST API（单学生进度/全班报告）；orchestrator.py generate_quiz（基于演示步骤 LLM 出题）+ answer_quiz（自动判题 + AI 苏格拉底式引导讲解）；manager.py quiz:generate/quiz:answer 路由；前端 QuizCard 组件（choice/true_false 双题型，含正确/错误反馈）；App.tsx/ChatPanel quiz:generated/quiz:result 渲染；掌握度自动更新（mastery 简单模型）；薄弱点分析 + 教学推荐"
     },
     {
       "id": "feat-007",
       "name": "课堂广播 & 多端同步",
       "description": "Redis Pub/Sub 课堂广播（教师讲→学生端同步）；WebSocket Room 管理 + 多设备连接池；演示同步（player:seek → 全班跳转到同一步骤）；课堂成员管理（Room Set）",
       "dependencies": ["feat-003"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "done",
+      "evidence": "RoomManager (rooms.py) 完整支持 join/leave/members/broadcast_to_students/broadcast_to_all；Redis Pub/Sub publish_teacher_action（跨进程广播）+ _pubsub_listen_loop 监听器（自动重连）；Redis 不可用时降级为本地广播；handlers.py role/student_id 查询参数 + 自动 join/leave；manager.py player:seek 路由→publish_teacher_action+student 私有 convId 路由；main.py Pub/Sub 监听器生命周期（start/stop）；学生独立 AI 对话上下文（student_conv_id → {roomConvId}:student:{studentId}）；模型 conv_id 字段从 36 扩展至 64 字符"
     },
     {
       "id": "feat-008",
