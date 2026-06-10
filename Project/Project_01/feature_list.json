@@ -37,8 +37,8 @@
       "name": "P2 专业模拟器（B+树 / 事务 / SQL 执行）",
       "description": "对话式构建 B+树模拟器（插入/删除/查找动画）；事务隔离级别模拟器（RR 幻读、锁竞争）；SQL 分步执行模拟器（F3.1-F3.3）；D3.js 动画配置对话生成",
       "dependencies": ["feat-004"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "done",
+      "evidence": "simulate_bplus_tree/transaction/sql_execution/strategy_compare 四个模拟器引擎；Orchestrator _detect_simulator_intent + _send_simulator_result 全链路；D3.js B+树节点动画+事务时间线；SimulatorPreview 三个渲染组件+参数调整+策略对比；simulator:update WS 事件；Redis/PG 降级处理"
     },
     {
       "id": "feat-006",
@@ -61,16 +61,16 @@
       "name": "对话搜索 / 版本快照 / 导出",
       "description": "按标题/日期/知识点搜索历史对话（F0.2）；演示版本快照回溯 + 对比（F5.3）；多格式导出（交互网页/MP4/Mermaid/LMS 嵌入，F5.1-F5.2）；基于已有演示复用改编（F5.4）",
       "dependencies": ["feat-006", "feat-007"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "done",
+      "evidence": "对话搜索 API（q/page/limit 参数，关键词匹配 title/summary/id）；版本快照列表 API；消息历史分页 API；演示对比 API（两版本逐步骤 diff）；演示复用 API（复制快照到新对话）；多格式导出（html/mermaid/lti）；前端搜索即时调用 + 改编按钮 + 格式选择"
     },
     {
       "id": "feat-009",
       "name": "课纲 RAG & 教师风格学习",
       "description": "PostgreSQL pgvector 课纲/教材向量化 RAG；知识点搜索 API；教师风格 Profile 自动学习（对话编辑偏好 → 逐渐个性化响应）；LLM 响应缓存（Redis，目标命中率 > 30%）",
       "dependencies": ["feat-008"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "done",
+      "evidence": "TeacherProfile PG 模型 + Redis 缓存 + GET/POST API；orchestrator _load_teacher_profile/_infer_style_from_edit/_update_style_from_edit（编辑操作推断偏好，异步更新）；LLM Gateway teacher_profile 参数传入；课纲搜索 API（15 个种子知识点，关键词匹配，Redis 5min 缓存，pgvector 预留）"
     },
     {
       "id": "feat-010",

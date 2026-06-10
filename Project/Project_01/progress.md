@@ -16,7 +16,55 @@
 #### feat-001 ~ feat-005 / feat-007 ✅（全部完成）
 - 见 progress.md 历史记录及此前会话
 
-#### feat-006 对话式测验 & 教学闭环 ✅（已全部完成）
+#### feat-009 课纲 RAG & 教师风格学习 ✅（已全部完成）
+
+- [x] **TeacherProfile 模型** (`backend/app/models/teacher.py` — 新建)
+  - PG 表（teacher_id PK，style/preferences/teaching_subjects JSON 字段）
+  - Redis 缓存（1h TTL），被 init_db 自动发现
+
+- [x] **教师 Profile REST API** (`backend/app/routes/teacher.py` — 新建)
+  - `GET /api/v5/teacher/profile?teacher_id=default` — 读取风格配置（Redis → PG → 默认值三级回退）
+  - `POST /api/v5/teacher/profile` — 保存风格配置，清除缓存
+  - API 前缀与 CLAUDE.md 文档一致
+
+- [x] **教师风格自动学习** (`backend/app/agents/orchestrator.py`)
+  - `_load_teacher_profile()` — 每次 `process_message` 自动加载 Profile
+  - `_infer_style_from_edit()` — 从 `step:regenerate` 操作推断偏好（篇幅/正式度/举例倾向）
+  - `_update_style_from_edit()` — 异步更新 Profile 到 PG + 刷新 Redis 缓存（不阻塞 AI 生成）
+  - LLM Gateway `generate_demo` 传入 `teacher_profile` 参数，影响生成风格
+
+- [x] **课纲 RAG & 知识点搜索 API** (`backend/app/routes/curriculum.py` — 新建)
+  - `GET /api/v5/curriculum/search?q=&category=` — 知识点搜索
+  - 内置种子知识库（15 个知识点：SQL 基础/索引/查询优化/事务）
+  - 关键词匹配（title/content/keywords 模糊搜索）
+  - Redis 缓存（5 分钟 TTL）
+  - pgvector 扩展检测 + 预留向量搜索接口（`PG_VECTOR_ENABLED=true` 时启用）
+
+- [x] **对话搜索 + 版本快照 API** (`backend/app/routes/conversations.py`)
+  - `GET /conversations?q=&page=&limit=` — 关键词搜索（title/summary/id） + 分页 + 总数
+  - `GET /conversations/{id}/snapshots` — 演示版本快照列表
+  - `GET /conversations/{id}/messages?page=&limit=` — 消息历史分页
+
+- [x] **演示对比 & 复用 API** (`backend/app/routes/demos.py` — 新建)
+  - `GET /demos/{id}` — 单个 DemoPackage 详情
+  - `POST /demos/{convId}/compare` — 两版本快照逐步骤对比（内容 diff 分析）
+  - `POST /demos/{convId}/copy` — 基于已有演示创建新对话（复用改编）
+
+- [x] **多格式导出增强** (`backend/app/agents/orchestrator.py`)
+  - 新增 mermaid 格式导出（提取各步骤 Mermaid 代码，打包为 Markdown）
+  - 新增 LTI 格式导出（LMS 嵌入 HTML，Canvas/Moodle 兼容）
+  - 保留原有 HTML 交互页导出
+
+- [x] **前端搜索 & 复用集成**
+  - `useConversations` — 新增 `search(q)` / `copy(id)` 方法
+  - `ConversationPanel` — 搜索输入即时调用后端 API；卡片新增"基于此改编"按钮
+  - `useWebSocket` — 支持 role/studentId 参数
+  - `App.tsx` — handleSearch/handleCopy/handleExport 集成
+
+- [x] **前端导出增强**
+  - `DemoPreview` — onExport 支持 `format` 参数
+  - `App.tsx` — demo:export 传递 format
+  - 导出按钮点击 → demo:export WebSocket 事件 → 后端生成对应格式
 
 - [x] **StudentProgress 模型** (`backend/app/models/student_progress.py`)
   - 学生掌握度追踪表（quiz_answers / mastery / total_questions / correct_answers）
