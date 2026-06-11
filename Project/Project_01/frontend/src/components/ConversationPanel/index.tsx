@@ -11,11 +11,15 @@ import {
   Trash2,
 } from "lucide-react";
 import type { Conversation } from "../../types";
+import { UserAccountBar } from "../UserAccountBar";
 
 interface Props {
   conversations: Conversation[];
   activeId: string | null;
   loading?: boolean;
+  teacherId?: string;
+  connected?: boolean;
+  onTeacherIdChange?: (id: string) => void;
   onSelect: (id: string) => void;
   onCreate: (title?: string) => void;
   onDelete: (id: string) => void;
@@ -23,6 +27,55 @@ interface Props {
   onCollapse?: () => void;
   onSearch?: (q: string) => void;
   onCopy?: (id: string, title?: string) => void;
+}
+
+type TimeGroupKey = "today" | "yesterday" | "older";
+
+const TIME_GROUPS: { key: TimeGroupKey; label: string }[] = [
+  { key: "today", label: "今天" },
+  { key: "yesterday", label: "昨天" },
+  { key: "older", label: "更早" },
+];
+
+function conversationTimestamp(c: Conversation): string {
+  return c.last_message_at || c.updated_at;
+}
+
+function getTimeGroupKey(iso: string): TimeGroupKey {
+  const date = new Date(iso);
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterdayStart = new Date(todayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+  if (date >= todayStart) return "today";
+  if (date >= yesterdayStart) return "yesterday";
+  return "older";
+}
+
+function groupByTime(conversations: Conversation[]): Record<TimeGroupKey, Conversation[]> {
+  const groups: Record<TimeGroupKey, Conversation[]> = {
+    today: [],
+    yesterday: [],
+    older: [],
+  };
+  for (const c of conversations) {
+    groups[getTimeGroupKey(conversationTimestamp(c))].push(c);
+  }
+  return groups;
+}
+
+function formatRelativeTime(iso: string): string {
+  const date = new Date(iso);
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 60_000) return "刚刚";
+  const diffMin = Math.floor(diffMs / 60_000);
+  if (diffMin < 60) return `${diffMin}分钟前`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (getTimeGroupKey(iso) === "today") return `${diffHour}小时前`;
+  if (getTimeGroupKey(iso) === "yesterday") return "昨天";
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay < 7) return `${diffDay}天前`;
+  return date.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
 }
 
 const CATEGORIES: { key: Conversation["status"] | "all"; label: string }[] = [
@@ -56,6 +109,9 @@ export default function ConversationPanel({
   conversations,
   activeId,
   loading = false,
+  teacherId,
+  connected,
+  onTeacherIdChange,
   onSelect,
   onCreate,
   onDelete,
@@ -78,16 +134,26 @@ export default function ConversationPanel({
     });
   }, [conversations, search, filter]);
 
-  const grouped = useMemo(() => {
-    const g: Record<string, Conversation[]> = {
-      active: [],
-      draft: [],
-      finalized: [],
-      archived: [],
-    };
-    for (const c of filtered) g[c.status]?.push(c);
-    return g;
-  }, [filtered]);
+  const groupedByTime = useMemo(() => groupByTime(filtered), [filtered]);
+
+  const renderCard = (c: Conversation) => (
+    <ConversationCard
+      key={c.id}
+      conversation={c}
+      active={activeId === c.id}
+      editing={editingId === c.id}
+      editTitle={editTitle}
+      relativeTime={formatRelativeTime(conversationTimestamp(c))}
+      onSelect={() => onSelect(c.id)}
+      onStartRename={() => handleStartRename(c)}
+      onChangeEditTitle={setEditTitle}
+      onConfirmRename={handleConfirmRename}
+      onDelete={() => {
+        if (confirm("确认删除？")) onDelete(c.id);
+      }}
+      onCopy={onCopy ? () => onCopy(c.id, `${c.title} (改编)`) : undefined}
+    />
+  );
 
   const handleCreate = () => onCreate(`新演示 ${conversations.length + 1}`);
   const handleStartRename = (c: Conversation) => {
@@ -121,7 +187,7 @@ export default function ConversationPanel({
               <button
                 type="button"
                 onClick={onCollapse}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100"
                 title="折叠左侧栏"
               >
                 <PanelLeftClose className="h-4 w-4" />
@@ -153,7 +219,7 @@ export default function ConversationPanel({
                      bg-slate-950 text-white font-medium text-xs tracking-wide
                      rounded-xl shadow-lg shadow-slate-950/10
                      hover:bg-slate-800 active:scale-[0.98]
-                     transition-all duration-150"
+                     transition-all duration-150 focus:outline-none focus:ring-4 focus:ring-slate-200"
         >
           <Plus className="w-4 h-4" />
           新建演示对话
@@ -210,51 +276,33 @@ export default function ConversationPanel({
             )}
           </div>
         ) : filter === "all" ? (
-          (["active", "draft", "finalized", "archived"] as const).map((status) => {
-            const items = grouped[status];
-            if (!items?.length) return null;
+          TIME_GROUPS.map(({ key, label }) => {
+            const items = groupedByTime[key];
+            if (!items.length) return null;
             return (
-              <div key={status} className="mb-2">
+              <div key={key} className="mb-2">
                 <div className="flex items-center gap-2 px-1 py-1.5">
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
-                    {CATEGORIES.find((c) => c.key === status)?.label}
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                    {label}
                   </span>
-                  <span className="text-[10px] text-slate-300 font-mono">{items.length}</span>
+                  <span className="font-mono text-[10px] text-slate-300">{items.length}</span>
                 </div>
-                {items.map((c) => (
-                  <ConversationCard
-                    key={c.id}
-                    conversation={c}
-                    active={activeId === c.id}
-                    editing={editingId === c.id}
-                    editTitle={editTitle}
-                    onSelect={() => onSelect(c.id)}
-                    onStartRename={() => handleStartRename(c)}
-                    onChangeEditTitle={setEditTitle}
-                    onConfirmRename={handleConfirmRename}
-                    onDelete={() => { if (confirm("确认删除？")) onDelete(c.id); }}
-                  />
-                ))}
+                {items.map((c) => renderCard(c))}
               </div>
             );
           })
         ) : (
-          filtered.map((c) => (
-            <ConversationCard
-              key={c.id}
-              conversation={c}
-              active={activeId === c.id}
-              editing={editingId === c.id}
-              editTitle={editTitle}
-              onSelect={() => onSelect(c.id)}
-              onStartRename={() => handleStartRename(c)}
-              onChangeEditTitle={setEditTitle}
-              onConfirmRename={handleConfirmRename}
-              onDelete={() => { if (confirm("确认删除？")) onDelete(c.id); }}
-            />
-          ))
+          filtered.map((c) => renderCard(c))
         )}
       </div>
+
+      {teacherId && onTeacherIdChange && (
+        <UserAccountBar
+          teacherId={teacherId}
+          connected={connected ?? false}
+          onTeacherIdChange={onTeacherIdChange}
+        />
+      )}
     </div>
   );
 }
@@ -267,6 +315,7 @@ function ConversationCard({
   active,
   editing,
   editTitle,
+  relativeTime,
   onSelect,
   onStartRename,
   onChangeEditTitle,
@@ -278,12 +327,13 @@ function ConversationCard({
   active: boolean;
   editing: boolean;
   editTitle: string;
+  relativeTime: string;
   onSelect: () => void;
   onStartRename: () => void;
   onChangeEditTitle: (v: string) => void;
   onConfirmRename: () => void;
   onDelete: () => void;
-  onCopy?: (id: string, title?: string) => void;
+  onCopy?: () => void;
 }) {
   const badge = STATUS_BADGE[c.status] || STATUS_BADGE.active;
 
@@ -350,6 +400,7 @@ function ConversationCard({
 
         {/* 右侧操作区 */}
         <div className="flex flex-col items-end gap-2 flex-shrink-0">
+          <span className="text-[10px] text-slate-400">{relativeTime}</span>
           <span
             className={`text-[11px] font-medium px-2 py-0.5 rounded-full shadow-sm ${badge.className}`}
           >
@@ -359,9 +410,9 @@ function ConversationCard({
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-150">
             {onCopy && c.snapshot_count > 0 && (
               <button
-                onClick={(e) => { e.stopPropagation(); onCopy(c.id, `${c.title} (改编)`); }}
+                onClick={(e) => { e.stopPropagation(); onCopy(); }}
                 className="flex items-center justify-center w-7 h-7 rounded-lg
-                           text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                           text-slate-400 transition hover:text-blue-600 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-100"
                 title="基于此演示改编"
               >
                 <Copy className="w-3.5 h-3.5" />
@@ -371,7 +422,7 @@ function ConversationCard({
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
               className="flex items-center justify-center w-7 h-7 rounded-lg
                          text-slate-300 hover:text-red-500 hover:bg-red-50
-                         transition-all duration-150"
+                         transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-100"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>

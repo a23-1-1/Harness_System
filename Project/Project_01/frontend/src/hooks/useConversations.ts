@@ -1,17 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import type { Conversation } from "../types";
 
 /**
- * 对话管理 Hook（调用 REST API）
+ * 对话管理 Hook（按 teacher_id 隔离）
  */
-export function useConversations() {
+export function useConversations(teacherId = "default") {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
 
-  const fetchList = async (q = "", page = 1, limit = 50) => {
+  const fetchList = useCallback(async (q = "", page = 1, limit = 50) => {
+    setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(limit),
+        teacher_id: teacherId,
+      });
       if (q) params.set("q", q);
       const res = await fetch(`/api/v5/conversations?${params}`);
       const data = await res.json();
@@ -19,17 +24,18 @@ export function useConversations() {
       setTotal(data.total ?? 0);
     } catch (err) {
       console.error("获取对话列表失败:", err);
+      setConversations([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
-  };
+  }, [teacherId]);
 
   useEffect(() => {
     fetchList();
-  }, []);
+  }, [fetchList]);
 
   const search = async (q: string) => {
-    setLoading(true);
     await fetchList(q);
   };
 
@@ -37,7 +43,7 @@ export function useConversations() {
     const res = await fetch("/api/v5/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({ title, teacher_id: teacherId }),
     });
     const conv = await res.json();
     setConversations((prev) => [conv, ...prev]);
@@ -72,5 +78,15 @@ export function useConversations() {
     return data.conversation;
   };
 
-  return { conversations, total, loading, search, create, remove, rename, copy };
+  return {
+    conversations,
+    total,
+    loading,
+    search,
+    create,
+    remove,
+    rename,
+    copy,
+    refresh: () => fetchList(),
+  };
 }

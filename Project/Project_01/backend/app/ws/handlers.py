@@ -6,6 +6,8 @@ DB Demo Studio — WebSocket 事件处理器
 from fastapi import APIRouter, WebSocket, Query
 from app.ws.manager import ws_manager
 from app.ws.rooms import room_manager
+from app.ws.history import load_conv_ws_messages
+from app.ws.history import load_conv_ws_messages
 
 router = APIRouter()
 
@@ -36,10 +38,11 @@ async def websocket_endpoint(
     await ws_manager.connect(websocket, conv_id, teacher_id)
     # 加入课堂 Room（教师/学生均可）
     await room_manager.join_room(websocket, conv_id, role, student_id, teacher_id)
-    # 发送连接确认
+    # 发送连接确认（含 PG 历史，demo_snapshot → demo:complete）
+    history = await load_conv_ws_messages(conv_id)
     await ws_manager.send_personal(websocket, "conv:loaded", {
         "convId": conv_id,
-        "messages": [],
+        "messages": history,
     })
     try:
         # 进入消息处理循环

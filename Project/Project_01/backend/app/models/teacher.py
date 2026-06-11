@@ -16,7 +16,11 @@ class TeacherProfile(Base):
     __tablename__ = "teacher_profiles"
 
     teacher_id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    style = Column(JSON, default=dict)       # {formality, depth, pace, examples}
+    display_name: Mapped[str] = mapped_column(String(128), default="")
+    email: Mapped[str] = mapped_column(String(256), default="")
+    avatar_url: Mapped[str] = mapped_column(String(512), default="")
+    role: Mapped[str] = mapped_column(String(32), default="teacher")
+    style = Column(JSON, default=dict)       # {formality, depth, pace, examples, notes}
     preferences = Column(JSON, default=dict) # {language, default_llm, export_format}
     teaching_subjects = Column(JSON, default=list)  # ["JOIN", "索引", "事务"]
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)

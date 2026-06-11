@@ -77,12 +77,12 @@ function StepNav({ active, total, onPrev, onNext }: {
     <div className="border-t border-slate-200 bg-white px-4 py-3">
       <div className="flex items-center justify-between">
         <button onClick={onPrev} disabled={active === 0}
-          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 disabled:opacity-30">
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 disabled:opacity-30 disabled:focus:ring-0">
           上一步
         </button>
         <span className="text-[11px] text-slate-500">{active + 1} / {total}</span>
         <button onClick={onNext} disabled={active >= total - 1}
-          className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-30">
+          className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:opacity-30 disabled:focus:ring-0">
           下一步
         </button>
       </div>
@@ -217,7 +217,7 @@ function TransactionSimulator({ steps, onSimulatorUpdate, simConfig }: {
           </button>
         </div>
         <svg ref={timelineRef} className="w-full" style={{ minHeight: 80 }} />
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 2xl:flex-row">
           {sessions?.map((s, i) => (
             <div key={i} className="flex-1 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
               <div className="mb-2 flex items-center gap-2">
@@ -261,7 +261,7 @@ function SqlExecutionSimulator({ steps }: { steps: DemoStep[] }) {
             <span className="text-xs font-semibold text-slate-700">执行流水线</span>
             <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-semibold text-violet-700">{action}</span>
           </div>
-          <div className="flex items-center justify-center gap-1 py-2">
+          <div className="scroll-area flex items-center gap-1 overflow-x-auto py-2">
             {steps.map((_, i) => (
               <div key={i} className="flex items-center gap-1">
                 <div className={`flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold ${
@@ -310,7 +310,7 @@ function StrategyCompareView({ steps }: { steps: DemoStep[] }) {
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {action === "overview" && strategies && (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 2xl:grid-cols-3">
             {strategies.map((s) => (
               <div key={s.name} className={`rounded-xl border-2 p-4 shadow-sm ${s.optimal ? "border-emerald-400 bg-emerald-50" : "border-slate-200 bg-white"}`}>
                 <div className="flex items-center justify-between mb-2">

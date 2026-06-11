@@ -628,6 +628,9 @@ h1 {{ font-size:1.8rem; margin-bottom:8px; }}
             )
             db.add(msg)
             conv.message_count += 1
+            now = datetime.now(tz=timezone.utc)
+            conv.last_message_at = now
+            conv.updated_at = now
             await db.commit()
             msg_id = msg.id
 
@@ -689,6 +692,9 @@ h1 {{ font-size:1.8rem; margin-bottom:8px; }}
             if conv:
                 conv.message_count += 1
                 conv.snapshot_count += 1
+                now = datetime.now(tz=timezone.utc)
+                conv.last_message_at = now
+                conv.updated_at = now
 
             await db.commit()
 

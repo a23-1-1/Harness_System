@@ -10,6 +10,36 @@ export function useWebSocket(teacherId = "default", convId = "default", role = "
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const tagMessage = useCallback(
+    (msg: WsMessage): WsMessage => ({
+      ...msg,
+      payload: { ...msg.payload, _convId: convId },
+    }),
+    [convId],
+  );
+
+  const handleIncoming = useCallback(
+    (msg: WsMessage) => {
+      const tagged = tagMessage(msg);
+      if (msg.event === "conv:loaded") {
+        const loaded = msg.payload.messages;
+        if (Array.isArray(loaded) && loaded.length > 0) {
+          setMessages(
+            (loaded as WsMessage[]).map((m) => ({
+              ...m,
+              payload: { ...m.payload, _convId: convId },
+            })),
+          );
+        } else {
+          setMessages([]);
+        }
+        return;
+      }
+      setMessages((prev) => [...prev, tagged]);
+    },
+    [convId, tagMessage],
+  );
+
   const connect = useCallback(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = import.meta.env.DEV ? "localhost:8000" : window.location.host;
@@ -25,7 +55,7 @@ export function useWebSocket(teacherId = "default", convId = "default", role = "
     ws.onmessage = (event) => {
       try {
         const msg: WsMessage = JSON.parse(event.data);
-        setMessages((prev) => [...prev, msg]);
+        handleIncoming(msg);
       } catch {
         console.warn("[WS] 消息解析失败:", event.data);
       }
@@ -43,9 +73,11 @@ export function useWebSocket(teacherId = "default", convId = "default", role = "
     };
 
     wsRef.current = ws;
-  }, [teacherId, convId]);
+  }, [teacherId, convId, handleIncoming]);
 
+  // 切换对话时清空消息，避免旧会话 demo:complete 等事件污染新会话 UI
   useEffect(() => {
+    setMessages([]);
     connect();
     return () => {
       if (reconnectTimer.current) {

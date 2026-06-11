@@ -75,18 +75,18 @@ def generate_mermaid(sql_analysis: dict, stage: str = "") -> dict:
         description = f"执行计划树{join_clause}"
 
     elif stage == "execute":
-        # 执行过程 — 顺序图展示数据流
+        # 执行过程 — 顺序图展示数据流（participant 使用安全别名）
         table_a = table_names[0] if table_names else "表A"
         table_b = table_names[1] if len(table_names) > 1 else "表B"
         mermaid = f"""sequenceDiagram
-    participant S as 存储引擎
-    participant {table_a}
-    participant {table_b}
-    S->>{table_a}: 扫描数据页
-    {table_a}-->>S: 返回匹配行
-    S->>{table_b}: 探测匹配
-    {table_b}-->>S: 返回结果
-    S->>S: 组装结果集"""
+    participant Storage as 存储引擎
+    participant T1 as {table_a}
+    participant T2 as {table_b}
+    Storage->>T1: 扫描数据页
+    T1-->>Storage: 返回匹配行
+    Storage->>T2: 探测匹配
+    T2-->>Storage: 返回结果
+    Storage->>Storage: 组装结果集"""
         diagram_type = "sequenceDiagram"
         description = f"执行过程数据流{join_clause}"
 

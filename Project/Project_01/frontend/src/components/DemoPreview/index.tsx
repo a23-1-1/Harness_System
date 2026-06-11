@@ -21,6 +21,12 @@ import {
 } from "lucide-react";
 import type { DemoComplete, DemoStep } from "../../types";
 import { normalizeDemoSteps } from "../../utils/demoNormalize";
+import {
+  cleanupMermaidOrphanNodes,
+  isRenderableMermaidCode,
+  mermaidFallbackFlowchart,
+  sanitizeMermaidCode,
+} from "../../utils/mermaidSanitize";
 
 // Mermaid 模块级单例——避免每渲染动态 import 和重新初始化（#7）
 let mermaidPromise: Promise<any> | null = null;
@@ -32,6 +38,7 @@ function getMermaid() {
         theme: "default",
         securityLevel: "loose",
         fontFamily: "system-ui, sans-serif",
+        suppressErrorRendering: true,
       });
       return mod.default;
     });
@@ -174,8 +181,8 @@ export default function DemoPreview({
 
   return (
     <div className="flex h-full flex-col bg-white text-slate-900">
-      <div className="border-b border-slate-200 bg-gradient-to-br from-blue-50 to-slate-50 px-6 py-5">
-        <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="border-b border-slate-200 bg-gradient-to-br from-blue-50 via-white to-slate-50 px-5 py-3.5">
+        <div className="mb-2.5 flex items-center justify-between gap-2">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
               Preview
@@ -187,7 +194,7 @@ export default function DemoPreview({
               <button
                 type="button"
                 onClick={onToggleWide}
-                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-2.5 text-xs font-semibold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50"
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-2.5 text-xs font-semibold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 focus:outline-none focus:ring-4 focus:ring-blue-100"
                 title={toggleWideTitle}
               >
                 {panelSize >= 2 ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
@@ -200,7 +207,7 @@ export default function DemoPreview({
             <button
               type="button"
               onClick={() => handleExport()}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100"
               title="导出演示"
             >
               <Download className="h-4 w-4" />
@@ -209,7 +216,7 @@ export default function DemoPreview({
               <button
                 type="button"
                 onClick={onCollapse}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100"
                 title="折叠右侧栏"
               >
                 <PanelRightClose className="h-4 w-4" />
@@ -222,7 +229,7 @@ export default function DemoPreview({
             导出请求已发送，检查消息列表查看结果
           </div>
         )}
-        <div className="flex overflow-x-auto rounded-lg bg-white p-1 shadow-sm ring-1 ring-slate-200">
+        <div className="flex overflow-x-auto rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.key;
@@ -230,7 +237,7 @@ export default function DemoPreview({
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex flex-shrink-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-2 text-xs font-semibold transition sm:px-3 ${
+                className={`flex flex-shrink-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-blue-100 sm:px-3 ${
                   active
                     ? "bg-blue-600 text-white shadow-sm"
                     : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
@@ -244,24 +251,24 @@ export default function DemoPreview({
         </div>
       </div>
 
-      <div className="border-b border-slate-200 bg-white px-7 py-6">
+      <div className="border-b border-slate-200 bg-white px-5 py-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-600">
               Live Demo Console
             </p>
-            <h2 className="mt-2 line-clamp-2 text-lg font-semibold tracking-tight">
+            <h2 className="mt-1.5 line-clamp-2 text-base font-semibold tracking-tight">
               {safeDemo.title}
             </h2>
-            <p className="mt-2 font-mono text-[10px] text-slate-500">{safeDemo.demoId}</p>
+            <p className="mt-1 hidden font-mono text-[10px] text-slate-500 2xl:block">{safeDemo.demoId}</p>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
             <CheckCircle2 className="h-3.5 w-3.5" />
             Ready
           </span>
         </div>
 
-        <div className="mt-5">
+        <div className="mt-3">
           <div className="flex items-center justify-between text-[11px] text-slate-500">
             <span>
               Step {activeIndex + 1}/{safeSteps.length}
@@ -303,37 +310,37 @@ export default function DemoPreview({
         {activeTab === "assets" && <AssetsView stepCount={safeSteps.length} />}
       </div>
 
-      <div className="border-t border-slate-200 bg-white px-6 py-4">
-        <div className="flex items-center justify-between gap-3">
+      <div className="border-t border-slate-200 bg-white px-[clamp(0.875rem,3vw,1.25rem)] py-3 sm:py-4">
+        <div className="flex flex-wrap items-center justify-between gap-[clamp(0.5rem,2vw,0.875rem)]">
           <button
             onClick={goPrev}
             disabled={activeIndex === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+            className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-[clamp(0.875rem,3vw,1.25rem)] py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 disabled:cursor-not-allowed disabled:opacity-35 disabled:focus:ring-0 sm:min-h-12 sm:px-5 sm:py-3 sm:text-base lg:text-base"
           >
-            <ChevronLeft className="h-3.5 w-3.5" />
+            <ChevronLeft className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
             上一步
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-1 basis-full items-center justify-center gap-2 sm:basis-auto">
             <button
               onClick={toggleAutoPlay}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
+              className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-[clamp(0.875rem,3vw,1.25rem)] py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-4 sm:min-h-12 sm:px-5 sm:py-3 sm:text-base lg:text-base ${
                 autoPlay
-                  ? "bg-red-500 text-white shadow-sm hover:bg-red-600"
-                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  ? "bg-red-500 text-white shadow-sm hover:bg-red-600 focus:ring-red-100"
+                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 focus:ring-slate-100"
               }`}
               title={autoPlay ? "停止自动播放" : "自动播放"}
             >
-              {autoPlay ? <Square className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+              {autoPlay ? <Square className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> : <Play className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />}
               {autoPlay ? "停止" : "自动"}
             </button>
 
-            <div className="flex items-center gap-1.5">
+            <div className="scroll-area flex max-w-[min(45%,12rem)] items-center gap-1.5 overflow-x-auto py-1 sm:max-w-[45%]">
               {safeSteps.map((step, index) => (
                 <button
                   key={`step-dot-${step.index}-${index}`}
                   onClick={() => setActiveIndex(index)}
-                  className={`h-2 rounded-full transition-all ${
+                  className={`h-2 flex-shrink-0 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-blue-100 ${
                     index === activeIndex
                       ? "w-6 bg-blue-600"
                       : index < activeIndex
@@ -349,10 +356,10 @@ export default function DemoPreview({
           <button
             onClick={goNext}
             disabled={activeIndex >= safeSteps.length - 1}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:opacity-100 disabled:shadow-none"
+            className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-[clamp(1rem,3.5vw,1.375rem)] py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-600/25 transition hover:bg-blue-700 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:opacity-100 disabled:shadow-none disabled:focus:ring-0 sm:min-h-12 sm:px-6 sm:py-3 sm:text-base lg:text-base"
           >
             下一步
-            <ChevronRight className="h-3.5 w-3.5" />
+            <ChevronRight className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
           </button>
         </div>
       </div>
@@ -382,8 +389,8 @@ function EmptyState({
 
   return (
     <div className="flex h-full flex-col bg-white text-slate-900">
-      <div className="border-b border-slate-200 bg-gradient-to-br from-blue-50 to-slate-50 px-6 py-5">
-        <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="border-b border-slate-200 bg-gradient-to-br from-blue-50 via-white to-slate-50 px-5 py-3.5">
+        <div className="mb-2.5 flex items-center justify-between gap-2">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
               Preview
@@ -395,7 +402,7 @@ function EmptyState({
               <button
                 type="button"
                 onClick={onToggleWide}
-                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-2.5 text-xs font-semibold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50"
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-2.5 text-xs font-semibold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 focus:outline-none focus:ring-4 focus:ring-blue-100"
                 title={toggleWideTitle}
               >
                 {panelSize >= 2 ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
@@ -409,7 +416,7 @@ function EmptyState({
               <button
                 type="button"
                 onClick={onCollapse}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100"
                 title="折叠右侧栏"
               >
                 <PanelRightClose className="h-4 w-4" />
@@ -417,13 +424,13 @@ function EmptyState({
             )}
           </div>
         </div>
-        <div className="grid grid-cols-5 gap-1 rounded-lg bg-white p-1 shadow-sm ring-1 ring-slate-200">
+        <div className="flex overflow-x-auto rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             return (
               <span
                 key={tab.key}
-                className="flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold text-slate-400"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-400 sm:px-3"
               >
                 <Icon className="h-3.5 w-3.5" />
                 {tab.label}
@@ -433,14 +440,14 @@ function EmptyState({
         </div>
       </div>
 
-      <div className="flex flex-1 items-center justify-center bg-slate-50 p-8">
+      <div className="flex flex-1 items-center justify-center bg-slate-50 p-6">
         <div className="max-w-xs text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white">
-            <PanelRightOpen className="h-8 w-8 text-slate-500" />
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-dashed border-blue-300 bg-white shadow-sm">
+            <PanelRightOpen className="h-8 w-8 text-blue-500" />
           </div>
           <h3 className="mt-5 text-base font-semibold">等待生成演示</h3>
           <p className="mt-2 text-sm leading-relaxed text-slate-500">
-            中间输入教学目标后，这里会显示流程、播放控制和页面预览。
+            中间输入教学目标后，这里会显示流程、播放控制、页面预览和专业模拟器。
           </p>
           <div className="mt-6 grid grid-cols-2 gap-2 text-left">
             {STAGE_LABELS.map((label, index) => (
@@ -625,15 +632,15 @@ function PagePreview({
             </div>
             <h4 className="mt-4 text-xl font-semibold text-slate-950">{activeStep.title}</h4>
             <p className="mt-3 text-sm leading-7 text-slate-700">{activeStep.content}</p>
-            {activeStep.mermaid && (
-              <div className="mt-4 rounded-xl border border-blue-100 bg-white p-4">
+            {activeStep.mermaid && isRenderableMermaidCode(activeStep.mermaid) && (
+              <div className="mt-4 max-h-72 overflow-hidden rounded-xl border border-blue-100 bg-white p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <span className="text-xs font-semibold text-slate-700">课堂图示</span>
                   <span className="font-mono text-[10px] text-slate-400">
                     {activeStep.mermaid_type || "mermaid"}
                   </span>
                 </div>
-                <MermaidRenderer code={activeStep.mermaid} />
+                <MermaidRenderer code={activeStep.mermaid} title={activeStep.title} />
               </div>
             )}
             {activeStep.interactive_hint && (
@@ -680,15 +687,15 @@ function PagePreview({
                     <span className="mt-2 block text-sm leading-7 text-slate-600">
                       {step.content}
                     </span>
-                    {step.mermaid && (
-                      <span className="mt-3 block rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    {step.mermaid && isRenderableMermaidCode(step.mermaid) && (
+                      <span className="mt-3 block max-h-56 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-4">
                         <span className="mb-3 flex items-center justify-between gap-3">
                           <span className="text-xs font-semibold text-slate-700">步骤图示</span>
                           <span className="font-mono text-[10px] text-slate-400">
                             {step.mermaid_type || "mermaid"}
                           </span>
                         </span>
-                        <MermaidRenderer code={step.mermaid} />
+                        <MermaidRenderer code={step.mermaid} title={step.title} />
                       </span>
                     )}
                   </span>
@@ -736,13 +743,13 @@ function PlayView({
         )}
       </div>
 
-      {step?.mermaid && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      {step?.mermaid && isRenderableMermaidCode(step.mermaid) && (
+        <div className="max-h-72 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-700">可视化</span>
             <span className="font-mono text-[10px] text-slate-500">{step.mermaid_type || "mermaid"}</span>
           </div>
-          <MermaidRenderer code={step.mermaid} />
+          <MermaidRenderer code={step.mermaid} title={step?.title} />
         </div>
       )}
 
@@ -766,42 +773,81 @@ function PlayView({
   );
 }
 
-function MermaidRenderer({ code }: { code: string }) {
+function MermaidRenderer({ code, title }: { code: string; title?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [usedFallback, setUsedFallback] = useState(false);
   const renderId = useRef(`mermaid-${Math.random().toString(36).slice(2, 8)}`).current;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!ref.current || !code) return;
+      if (!ref.current || !code || !isRenderableMermaidCode(code)) {
+        setError(code?.trim() ? "图表语法无法解析，已跳过渲染" : null);
+        return;
+      }
+      const sanitized = sanitizeMermaidCode(code);
+      const candidates = [
+        sanitized,
+        ...(sanitized !== code ? [code] : []),
+        mermaidFallbackFlowchart(title || "执行过程"),
+      ];
+
       try {
         const mermaid = await getMermaid();
         if (cancelled) return;
-        ref.current.innerHTML = "";
-        const { svg } = await mermaid.render(renderId, code);
-        if (cancelled) return;
-        if (ref.current) ref.current.innerHTML = svg;
-        setError(null);
+
+        for (let i = 0; i < candidates.length; i += 1) {
+          const candidate = candidates[i];
+          if (!candidate.trim() || !isRenderableMermaidCode(candidate)) continue;
+          try {
+            if (ref.current) ref.current.innerHTML = "";
+            const { svg } = await mermaid.render(`${renderId}-${i}`, candidate);
+            if (cancelled) return;
+            cleanupMermaidOrphanNodes();
+            if (ref.current) ref.current.innerHTML = svg;
+            setError(null);
+            setUsedFallback(i === candidates.length - 1);
+            return;
+          } catch {
+            cleanupMermaidOrphanNodes();
+          }
+        }
+        setError("图表语法无法解析，已跳过渲染");
+        setUsedFallback(true);
       } catch (e) {
+        cleanupMermaidOrphanNodes();
         setError(`渲染失败: ${e instanceof Error ? e.message : String(e)}`);
       }
     })();
-    return () => { cancelled = true; };
-  }, [code, renderId]);
+    return () => {
+      cancelled = true;
+      if (ref.current) ref.current.innerHTML = "";
+      cleanupMermaidOrphanNodes();
+    };
+  }, [code, renderId, title]);
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-        {error}
-        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-[10px] text-red-500">{code}</pre>
+      <div className="max-h-20 overflow-hidden rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+        <p className="line-clamp-2">{error}</p>
+        <p className="mt-1 line-clamp-1 text-[11px] text-amber-700/80">
+          可在对话中要求「简化流程图」或「改用 flowchart」重新生成。
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="flex justify-center overflow-x-auto">
-      <div ref={ref} className="max-w-full" />
+    <div className="max-h-64 overflow-hidden">
+      {usedFallback && (
+        <p className="mb-2 text-[11px] font-medium text-slate-500">
+          原图语法有误，已显示简化示意
+        </p>
+      )}
+      <div className="flex justify-center overflow-x-auto">
+        <div ref={ref} className="max-w-full" />
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import {
   Bot,
@@ -13,6 +13,20 @@ import {
 } from "lucide-react";
 import type { Conversation, WsMessage } from "../../types";
 import QuizCard from "./QuizCard";
+import {
+  buildChatDisplayItems,
+  type StepPreviewSummary,
+} from "../../utils/chatDisplay";
+
+const CHAT_VISIBLE_MESSAGE_EVENTS = new Set([
+  "demo:complete",
+  "demo:updated",
+  "step:regenerated",
+  "quiz:generated",
+  "quiz:result",
+  "error",
+  "simulator:update",
+]);
 
 interface Props {
   messages: WsMessage[];
@@ -112,9 +126,11 @@ export default function ChatPanel({
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const displayItems = useMemo(() => buildChatDisplayItems(messages), [messages]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [displayItems]);
 
   const sendCurrentInput = () => {
     if (!input.trim()) return;
@@ -144,13 +160,13 @@ export default function ChatPanel({
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_42%,#eef6ff_100%)]">
-      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-8 py-5 backdrop-blur">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/20">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
             <Bot className="h-5 w-5" />
           </div>
-          <div>
-            <p className="text-base font-semibold tracking-tight text-slate-900">
+          <div className="min-w-0">
+            <p className="truncate text-base font-semibold tracking-tight text-slate-900">
               {activeConversation?.title || "AI 演示编排器"}
             </p>
             <div className="mt-0.5 flex items-center gap-2 text-sm text-slate-500">
@@ -181,7 +197,7 @@ export default function ChatPanel({
         </div>
       </div>
 
-      <div className="scroll-area min-h-0 flex-1 overflow-y-auto px-5 pt-6 sm:px-8 lg:px-10 lg:pt-8">
+      <div className="scroll-area min-h-0 flex-1 overflow-y-auto px-4 pt-5 sm:px-7 lg:px-8 lg:pt-6">
         {messages.length === 0 ? (
           <WelcomeView
             onQuickSelect={setInput}
@@ -189,45 +205,58 @@ export default function ChatPanel({
             hasActiveConversation={Boolean(activeConv)}
           />
         ) : (
-          <div className="space-y-4">
-            {messages.map((msg, i) => (
-              <MessageBubble key={`${msg.event}-${i}`} msg={msg} onQuizAnswer={onQuizAnswer} />
-            ))}
+          <div className="mx-auto max-w-[920px] space-y-4">
+            {displayItems.map((item, i) =>
+              item.kind === "generation" ? (
+                <GenerationProgressBubble
+                  key={`gen-${i}-${item.steps.length}-${item.thinkingMessage ?? ""}`}
+                  steps={item.steps}
+                  thinkingMessage={item.thinkingMessage}
+                  interrupted={item.interrupted}
+                />
+              ) : (
+                <MessageBubble
+                  key={`${item.msg.event}-${i}`}
+                  msg={item.msg}
+                  onQuizAnswer={onQuizAnswer}
+                />
+              ),
+            )}
           </div>
         )}
-        <div className="h-[24rem] shrink-0" aria-hidden="true" />
+        <div className="h-[15rem] shrink-0" aria-hidden="true" />
         <div ref={messagesEndRef} />
       </div>
 
       <form
         onSubmit={handleSubmit}
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center bg-gradient-to-t from-[#f8fafc] via-[#f8fafc]/95 to-transparent px-4 pb-5 pt-16 sm:px-8 sm:pb-7 lg:px-10"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center bg-gradient-to-t from-[#f8fafc] via-[#f8fafc]/95 to-transparent px-4 pb-4 pt-12 sm:px-7 sm:pb-5 lg:px-8"
       >
-        <div className="pointer-events-auto w-full max-w-[820px] overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.16)] transition focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-100">
+        <div className="pointer-events-auto w-full max-w-[860px] rounded-[1.35rem] border border-slate-200 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.16)] transition focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-100">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="输入 SQL、知识点或教学目标，例如：用动画解释 Hash Join 为什么适合大表等值连接"
             rows={3}
-            className="block max-h-40 min-h-24 w-full resize-none bg-white px-5 py-4 text-base leading-7 text-slate-800 outline-none placeholder:text-slate-400 sm:px-6"
+            className="box-border block max-h-40 min-h-20 w-full resize-none rounded-t-[1.35rem] border-0 bg-white py-3.5 pl-[clamp(1.375rem,4vw,1.875rem)] pr-[clamp(1.125rem,3.5vw,1.625rem)] text-base leading-7 text-slate-800 outline-none placeholder:text-slate-400 sm:py-4"
           />
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 px-5 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-b-[1.35rem] border-t border-slate-100 bg-slate-50/70 px-[clamp(1rem,3.5vw,1.5rem)] py-3 sm:py-3.5">
             <div className="flex flex-wrap items-center gap-2">
               {isGenerating && (
                 <button
                   type="button"
                   onClick={onInterrupt}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-red-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-500/20 transition hover:bg-red-600 active:scale-95"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-red-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-500/20 transition hover:bg-red-600 focus:outline-none focus:ring-4 focus:ring-red-100 active:scale-95"
                 >
-                  <Square />
+                  <Square className="h-4 w-4" />
                   停止生成
                 </button>
               )}
               <button
                 type="button"
                 onClick={insertSqlTemplate}
-                className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-sm font-medium text-slate-600 ring-1 ring-slate-200 transition hover:bg-blue-50 hover:text-blue-700 hover:ring-blue-200"
+                className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-sm font-medium text-slate-600 ring-1 ring-slate-200 transition hover:bg-blue-50 hover:text-blue-700 hover:ring-blue-200 focus:outline-none focus:ring-4 focus:ring-blue-100"
               >
                 <Code2 className="h-4 w-4" />
                 SQL 模板
@@ -239,7 +268,7 @@ export default function ChatPanel({
                     "请把当前演示改成适合 10 分钟课堂讲解的版本，增加提问点和关键总结。",
                   )
                 }
-                className="rounded-full bg-white px-3.5 py-2 text-sm font-medium text-slate-600 ring-1 ring-slate-200 transition hover:bg-violet-50 hover:text-violet-700 hover:ring-violet-200"
+                className="rounded-full bg-white px-3.5 py-2 text-sm font-medium text-slate-600 ring-1 ring-slate-200 transition hover:bg-violet-50 hover:text-violet-700 hover:ring-violet-200 focus:outline-none focus:ring-4 focus:ring-violet-100"
               >
                 优化讲稿
               </button>
@@ -247,11 +276,11 @@ export default function ChatPanel({
             <button
               type="submit"
               disabled={!connected || !input.trim()}
-              className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none disabled:focus:ring-0 sm:min-h-12 sm:px-6 sm:py-3 sm:text-base"
               title={!connected ? "实时通道未连接，暂时无法发送" : "发送消息"}
             >
               {connected ? "生成演示" : "未连接"}
-              <SendHorizonal className="h-4 w-4" />
+              <SendHorizonal className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
             </button>
           </div>
         </div>
@@ -270,7 +299,7 @@ function WelcomeView({
   hasActiveConversation: boolean;
 }) {
   return (
-    <div className="flex min-h-full items-center justify-center px-10 py-10">
+    <div className="flex min-h-full items-center justify-center px-4 py-8 sm:px-8">
       <div className="w-full max-w-4xl">
         <div className="text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
@@ -285,7 +314,7 @@ function WelcomeView({
           {!hasActiveConversation && (
             <button
               onClick={() => onCreateConversation()}
-              className="mt-5 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:bg-blue-700"
+              className="mt-5 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-slate-200 active:translate-y-0"
             >
               新建并保存对话
             </button>
@@ -297,7 +326,7 @@ function WelcomeView({
             <button
               key={card.title}
               onClick={() => onQuickSelect(card.prompt)}
-              className="group flex min-h-44 flex-col items-start rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100/80"
+              className="group flex min-h-40 flex-col items-start rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100/80 focus:outline-none focus:ring-4 focus:ring-blue-100"
             >
               <span className="rounded-full bg-blue-50 px-3 py-1.5 font-mono text-xs font-bold text-blue-700 ring-1 ring-blue-100">
                 {card.icon}
@@ -319,6 +348,75 @@ function WelcomeView({
   );
 }
 
+function GenerationProgressBubble({
+  steps,
+  thinkingMessage,
+  interrupted,
+}: {
+  steps: StepPreviewSummary[];
+  thinkingMessage?: string;
+  interrupted?: boolean;
+}) {
+  const sortedSteps = [...steps].sort((a, b) => a.stepIndex - b.stepIndex);
+  const statusText = interrupted
+    ? thinkingMessage || "生成已停止"
+    : thinkingMessage || "正在生成演示步骤…";
+
+  return (
+    <div className="flex gap-3">
+      <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 shadow-sm">
+        <Sparkles className="h-4 w-4 text-white" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div
+          className={`rounded-3xl border p-4 ${
+            interrupted
+              ? "border-amber-200 bg-amber-50"
+              : "border-blue-100 bg-blue-50"
+          }`}
+        >
+          <div
+            className={`flex items-center gap-2.5 text-sm font-medium ${
+              interrupted ? "text-amber-700" : "text-blue-700"
+            }`}
+          >
+            {!interrupted && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+            <span>{statusText}</span>
+          </div>
+
+          {sortedSteps.length > 0 && (
+            <ul className="mt-3 space-y-1.5">
+              {sortedSteps.map((step) => (
+                <li
+                  key={`${step.stepIndex}-${step.title}`}
+                  className="flex items-start gap-2 text-sm text-slate-600"
+                >
+                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-emerald-500" />
+                  <span className="min-w-0 break-words">
+                    {step.stepIndex > 0 ? `第 ${step.stepIndex} 步` : "步骤"}
+                    「{step.title}」
+                    {step.stage ? (
+                      <span className="ml-1.5 rounded-full border border-blue-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-blue-600">
+                        {step.stage}
+                      </span>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {!interrupted && (
+            <div className="mt-3 h-1 rounded-full bg-blue-100">
+              <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-blue-500 to-indigo-500" />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MessageBubble({ msg, onQuizAnswer }: { msg: WsMessage; onQuizAnswer?: (questionId: string, answer: string, question: Record<string, unknown>) => void }) {
   const payload = msg.payload as Record<string, unknown>;
   const content =
@@ -331,7 +429,7 @@ function MessageBubble({ msg, onQuizAnswer }: { msg: WsMessage; onQuizAnswer?: (
   if (msg.event === "chat:message") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[82%] rounded-3xl rounded-tr-md bg-blue-600 px-4 py-3 text-base leading-relaxed text-white shadow-lg shadow-blue-600/15">
+        <div className="max-w-[78%] rounded-3xl rounded-tr-md bg-blue-600 px-4 py-3 text-base leading-relaxed text-white shadow-lg shadow-blue-600/15">
           <p className="whitespace-pre-wrap break-words">
             {content || "已发送请求，正在处理。"}
           </p>
@@ -340,32 +438,8 @@ function MessageBubble({ msg, onQuizAnswer }: { msg: WsMessage; onQuizAnswer?: (
     );
   }
 
-  if (msg.event === "agent:thinking") {
-    const step = payload.step as string;
-    const message = payload.message as string;
-    const toolLabel =
-      step === "analyze"
-        ? "正在调用 sql_analyze 分析 SQL..."
-        : message || "正在调度演示生成工具链...";
-
-    return (
-      <div className="flex gap-3">
-        <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 shadow-sm">
-          <Sparkles className="h-4 w-4 text-white" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="rounded-3xl border border-blue-100 bg-blue-50 p-4">
-            <div className="flex items-center gap-2.5 text-sm font-medium text-blue-700">
-              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-              <span>{toolLabel}</span>
-            </div>
-            <div className="mt-3 h-1 rounded-full bg-blue-100">
-              <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 animate-pulse" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  if (!CHAT_VISIBLE_MESSAGE_EVENTS.has(msg.event)) {
+    return null;
   }
 
   const meta = EVENT_META[msg.event];
@@ -411,11 +485,17 @@ function MessageBubble({ msg, onQuizAnswer }: { msg: WsMessage; onQuizAnswer?: (
             <QuizMessage payload={payload as Record<string, unknown>} onQuizAnswer={onQuizAnswer} />
           ) : msg.event === "quiz:result" ? (
             <QuizResultMessage payload={payload as Record<string, unknown>} />
-          ) : (msg.event === "step:preview" || msg.event === "step:regenerated") && payload.title ? (
+          ) : msg.event === "step:regenerated" && payload.title ? (
             <StepPreviewMessage event={msg.event} payload={payload as Record<string, unknown>} />
-          ) : (
+          ) : msg.event === "error" ? (
             <SystemEventMessage event={msg.event} payload={payload} content={content} />
-          )}
+          ) : msg.event === "simulator:update" ? (
+            <SystemEventMessage
+              event={msg.event}
+              payload={payload}
+              content={content || "模拟器参数已更新，请查看右侧预览。"}
+            />
+          ) : null}
         </div>
       </div>
     </div>
@@ -431,8 +511,8 @@ function DemoCompleteMessage({ payload }: { payload: DemoPayload }) {
       <p className="mt-1 text-sm text-emerald-700">
         已生成 {steps.length} 个步骤，完整流程、播放控制和可视化素材已同步到右侧预览。
       </p>
-      <p className="mt-3 inline-flex rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-semibold text-emerald-700">
-        请在右侧 Demo Preview 播放和调整
+      <p className="mt-3 inline-flex rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm">
+        请打开右侧大预览查看页面、播放和模拟器
       </p>
     </div>
   );

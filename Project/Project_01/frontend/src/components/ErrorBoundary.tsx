@@ -2,6 +2,9 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
+  /** 嵌套在面板内时使用紧凑错误条，而非全屏阻断 */
+  compact?: boolean;
+  label?: string;
 }
 
 interface State {
@@ -21,6 +24,24 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.error) {
+      if (this.props.compact) {
+        return (
+          <div className="flex h-full flex-col bg-white p-4">
+            <div className="max-h-24 overflow-hidden rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <p className="font-semibold">{this.props.label || "预览"}渲染异常</p>
+              <p className="mt-1 line-clamp-2">{this.state.error.message}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => this.setState({ error: null })}
+              className="mt-3 self-start rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              重试
+            </button>
+          </div>
+        );
+      }
+
       return (
         <div className="flex min-h-screen items-center justify-center bg-slate-50 p-8">
           <div className="max-w-md rounded-2xl border border-red-200 bg-white p-6 shadow-sm">

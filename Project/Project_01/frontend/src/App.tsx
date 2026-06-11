@@ -12,9 +12,11 @@ import {
 } from "lucide-react";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useConversations } from "./hooks/useConversations";
+import { readStoredTeacherId, writeStoredTeacherId } from "./hooks/useTeacherProfile";
 import ConversationPanel from "./components/ConversationPanel";
 import ChatPanel from "./components/ChatPanel";
 import DemoPreview from "./components/DemoPreview";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import type { DemoComplete } from "./types";
 import {
   normalizeDemoPayload,
@@ -25,28 +27,46 @@ import {
 type RightPreviewSize = 0 | 1 | 2;
 
 const RIGHT_PREVIEW_WIDTHS: Record<RightPreviewSize, number> = {
-  0: 380,
-  1: 560,
-  2: 720,
+  0: 420,
+  1: 640,
+  2: 800,
 };
 
 export default function App() {
+  const [teacherId, setTeacherId] = useState(readStoredTeacherId);
   const [activeConv, setActiveConv] = useState<string | null>(null);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [rightPreviewSize, setRightPreviewSize] = useState<RightPreviewSize>(0);
   const { connected, messages: wsMessages, send } = useWebSocket(
-    "default",
+    teacherId,
     activeConv || "default",
     "teacher",
     "",
   );
-  const { conversations, loading, total, search, create, remove, rename, copy } = useConversations();
+  const { conversations, loading, total, search, create, remove, rename, copy } =
+    useConversations(teacherId);
   const [lastDemo, setLastDemo] = useState<DemoComplete | null>(null);
   const activeConversation = useMemo(
     () => conversations.find((c) => c.id === activeConv) || null,
     [activeConv, conversations],
   );
+
+  // 切换教师账户时清空当前会话与预览
+  useEffect(() => {
+    setActiveConv(null);
+    setLastDemo(null);
+  }, [teacherId]);
+
+  // 切换/新建对话时清空预览，避免旧演示的 Mermaid 在空会话中继续渲染
+  useEffect(() => {
+    setLastDemo(null);
+  }, [activeConv]);
+
+  const handleTeacherIdChange = (id: string) => {
+    writeStoredTeacherId(id);
+    setTeacherId(id);
+  };
 
   const latestDemoMsg = useMemo(
     () => [...wsMessages].reverse().find((m) => m.event === "demo:complete"),
@@ -70,11 +90,12 @@ export default function App() {
 
   // demo:complete → 仅在最近没有 demo:updated 时才设置 lastDemo
   // 防止 demo:complete 覆盖模拟器参数调整的结果（#1）
+  const latestDemoMsgIndex = latestDemoMsg ? wsMessages.indexOf(latestDemoMsg) : -1;
   const hasNewerUpdated = useMemo(() => {
     return wsMessages.some(
-      (m) => m.event === "demo:updated" && wsMessages.indexOf(m) > (wsMessages.indexOf(latestDemoMsg as any) || -1)
+      (m) => m.event === "demo:updated" && wsMessages.indexOf(m) > latestDemoMsgIndex,
     );
-  }, [wsMessages, latestDemoMsg]);
+  }, [wsMessages, latestDemoMsgIndex]);
 
   useEffect(() => {
     if (latestDemoMsg && !hasNewerUpdated) {
@@ -180,60 +201,68 @@ export default function App() {
   };
 
   const panelClass =
-    "h-full min-h-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_10px_30px_-24px_rgba(15,23,42,0.35),0_1px_2px_rgba(15,23,42,0.04)]";
+    "h-full min-h-0 overflow-hidden rounded-[1.35rem] border border-slate-200/80 bg-white shadow-[0_18px_45px_-34px_rgba(15,23,42,0.45),0_1px_2px_rgba(15,23,42,0.04)]";
   const rightColumnWidth = rightCollapsed ? 64 : RIGHT_PREVIEW_WIDTHS[rightPreviewSize];
-  const desktopGridColumns = `${leftCollapsed ? 64 : 248}px minmax(0, 1fr) ${
+  const desktopGridColumns = `${leftCollapsed ? 64 : 232}px minmax(460px, 1fr) ${
     rightColumnWidth
   }px`;
 
   return (
-    <div className="h-screen overflow-hidden bg-[#f1f5f9] text-slate-900">
-      <div className="mx-auto flex h-full max-w-[1800px] flex-col px-4 py-4 sm:px-6 lg:px-8">
-        <header className="mb-4 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white/95 px-5 py-4 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,#e0f2fe_0,#f8fafc_30%,#eef2f7_100%)] text-slate-900">
+      <div className="mx-auto flex h-full max-w-[1840px] flex-col px-3 py-3 sm:px-5 lg:px-6">
+        <header className="mb-3 flex flex-col gap-3 rounded-2xl border border-white/80 bg-white/90 px-4 py-3 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-sm shadow-blue-600/20">
               <DatabaseZap className="h-5 w-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-semibold tracking-tight text-slate-950">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-base font-semibold tracking-tight text-slate-950 sm:text-lg">
                   DB Demo Studio
                 </h1>
-                <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+                <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
                   AI Harness
                 </span>
               </div>
-              <p className="text-sm text-slate-500">
+              <p className="truncate text-xs text-slate-500 sm:text-sm">
                 从 SQL 或知识点生成可播放、可讲解、可复用的数据库教学演示
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 sm:text-sm">
             <button
               onClick={() => handleCreateConv()}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-blue-700"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2 font-semibold text-white shadow-sm shadow-blue-600/15 transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 active:translate-y-0"
             >
               <Plus className="h-3.5 w-3.5" />
               新建演示
             </button>
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <PanelLeft className="h-3.5 w-3.5 text-slate-400" />
               {loading ? "加载对话中" : `${conversations.length} 个对话`}
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <Activity className="h-3.5 w-3.5 text-emerald-500" />
               {connected ? "实时通道已连接" : "实时通道未连接"}
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (rightCollapsed) setRightCollapsed(false);
+                setRightPreviewSize(2);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 font-semibold text-blue-700 transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-4 focus:ring-blue-100 active:translate-y-0"
+              title="打开最大预览栏"
+            >
               <Sparkles className="h-3.5 w-3.5 text-violet-500" />
-              {lastDemo ? "演示已生成" : "等待生成演示"}
-            </span>
+              {lastDemo ? "打开大预览" : "等待生成演示"}
+            </button>
           </div>
         </header>
 
         <div
-          className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-[var(--desktop-grid-columns)]"
+          className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-[var(--desktop-grid-columns)]"
           style={
             {
               "--desktop-grid-columns": desktopGridColumns,
@@ -241,7 +270,7 @@ export default function App() {
           }
         >
           {/* 左栏：对话列表 */}
-          <div className="min-h-[340px] lg:min-h-0">
+          <div className="min-h-[300px] xl:min-h-0">
             <div className={panelClass}>
               {leftCollapsed ? (
                 <CollapsedRail
@@ -254,6 +283,9 @@ export default function App() {
                 <ConversationPanel
                   conversations={conversations}
                   activeId={activeConv}
+                  teacherId={teacherId}
+                  connected={connected}
+                  onTeacherIdChange={handleTeacherIdChange}
                   onSelect={setActiveConv}
                   onCreate={handleCreateConv}
                   onDelete={remove}
@@ -268,7 +300,7 @@ export default function App() {
           </div>
 
           {/* 中栏：核心对话工作区 */}
-          <div className="min-h-[520px] min-w-0 lg:min-h-0">
+          <div className="min-h-[520px] min-w-0 xl:min-h-0">
             <div className={panelClass}>
               <ChatPanel
                 messages={wsMessages}
@@ -285,7 +317,7 @@ export default function App() {
           </div>
 
           {/* 右栏：动态演示预览 */}
-          <div className="min-h-[420px] min-w-0 lg:min-h-0">
+          <div className="min-h-[520px] min-w-0 xl:min-h-0">
             <div className={panelClass}>
               {rightCollapsed ? (
                 <CollapsedRail
@@ -295,20 +327,22 @@ export default function App() {
                   onToggle={() => setRightCollapsed(false)}
                 />
               ) : (
-                <DemoPreview
-                  demo={lastDemo}
-                  panelSize={rightPreviewSize}
-                  isWide={rightPreviewSize > 0}
-                  onToggleWide={cycleRightPreviewSize}
-                  onCollapse={() => setRightCollapsed(true)}
-                  onExport={(fmt) => send("demo:export", { format: fmt || "html" })}
-                  onRegenerate={(stepIndex, instructions) =>
-                    send("step:regenerate", { stepIndex, instructions })
-                  }
-                  onSimulatorUpdate={(simulatorType, params) =>
-                    send("simulator:update", { simulator_type: simulatorType, params })
-                  }
-                />
+                <ErrorBoundary compact label="演示预览">
+                  <DemoPreview
+                    demo={lastDemo}
+                    panelSize={rightPreviewSize}
+                    isWide={rightPreviewSize > 0}
+                    onToggleWide={cycleRightPreviewSize}
+                    onCollapse={() => setRightCollapsed(true)}
+                    onExport={(fmt) => send("demo:export", { format: fmt || "html" })}
+                    onRegenerate={(stepIndex, instructions) =>
+                      send("step:regenerate", { stepIndex, instructions })
+                    }
+                    onSimulatorUpdate={(simulatorType, params) =>
+                      send("simulator:update", { simulator_type: simulatorType, params })
+                    }
+                  />
+                </ErrorBoundary>
               )}
             </div>
           </div>
@@ -335,7 +369,7 @@ function CollapsedRail({
   return (
     <button
       onClick={onToggle}
-      className="flex h-full w-full flex-col items-center justify-between bg-slate-50 px-3 py-4 text-slate-500 transition hover:bg-blue-50 hover:text-blue-700"
+      className="flex h-full w-full flex-col items-center justify-between bg-slate-50 px-3 py-4 text-slate-500 transition hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-4 focus:ring-inset focus:ring-blue-100"
       title={`展开${label}栏`}
     >
       <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white shadow-sm">

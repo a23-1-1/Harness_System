@@ -34,6 +34,7 @@ class ConversationUpdate(BaseModel):
 @router.get("")
 async def list_conversations(
     q: str = "",
+    teacher_id: str = "",
     page: int = 1,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
@@ -46,6 +47,8 @@ async def list_conversations(
         select(Conversation)
         .where(~Conversation.id.like("%:student:%"))
     )
+    if teacher_id:
+        query = query.where(Conversation.teacher_id == teacher_id)
     if q:
         # 转义 LIKE 通配符，避免用户搜索 "100%" 意外匹配过多结果
         safe_q = q.replace("%", "\\%").replace("_", "\\_")
@@ -64,7 +67,7 @@ async def list_conversations(
     query = query.offset((page - 1) * limit).limit(limit)
     result = await db.execute(query)
     conversations = result.scalars().all()
-    logger.info("获取对话列表", extra={"data": {"count": len(conversations), "total": total, "q": q}})
+    logger.info("获取对话列表", extra={"data": {"count": len(conversations), "total": total, "q": q, "teacherId": teacher_id}})
     return {
         "conversations": [conv_to_dict(c) for c in conversations],
         "total": total,
@@ -198,4 +201,9 @@ def conv_to_dict(conv: Conversation) -> dict:
         "summary": conv.summary,
         "created_at": conv.created_at.isoformat() if conv.created_at else "",
         "updated_at": conv.updated_at.isoformat() if conv.updated_at else "",
+        "last_message_at": (
+            conv.last_message_at.isoformat()
+            if conv.last_message_at
+            else (conv.updated_at.isoformat() if conv.updated_at else "")
+        ),
     }

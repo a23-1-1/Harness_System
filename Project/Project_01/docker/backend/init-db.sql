@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     message_count INTEGER DEFAULT 0,
     snapshot_count INTEGER DEFAULT 0,
     summary TEXT DEFAULT '',
+    last_message_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -58,11 +59,18 @@ CREATE TABLE IF NOT EXISTS demos (
 CREATE INDEX IF NOT EXISTS idx_demos_conv ON demos(conv_id, snapshot_order);
 
 -- ─── 教师 Profile 表 ─────────────────────────────────────────
+-- teacher_profiles 即用户表（教师账号），无需单独 teachers 表
 CREATE TABLE IF NOT EXISTS teacher_profiles (
     teacher_id TEXT PRIMARY KEY,
+    display_name TEXT DEFAULT '',
+    email TEXT DEFAULT '',
+    avatar_url TEXT DEFAULT '',
+    role TEXT DEFAULT 'teacher',
     style JSONB DEFAULT '{}',
     preferences JSONB DEFAULT '{}',
+    teaching_subjects JSONB DEFAULT '[]',
     embedding vector(1536),
+    created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 
