@@ -103,14 +103,21 @@ model: sonnet
 - 完成后更新 `feature_list.json` 状态（done/in-progress）和 evidence
 - 更新 `progress.md` 记录 session 完成内容
 
-### 6. 提交 & PR
+### 6. 提交 & PR（手动）
+
+开发过程中生成的 commits 由开发者手动提交：
+
 ```bash
 git add <changed files>
 git commit -m "feat(feat-xxx): 功能描述"
 git push origin <branch>
-# 手动创建 PR：
-# https://github.com/a23-1-1/Harness_System/pull/new/<branch>
 ```
+
+PR 也手动创建：
+- 访问 https://github.com/a23-1-1/Harness_System/pull/new/<branch>
+- 手动填写标题和 body
+
+skill 不会代你执行 `git add`、`git commit` 或 `git push`。
 
 ## 文件约束
 - 后端：`backend/app/` 下按层组织（agents/、llm/、mcp/、models/、routes/、ws/）

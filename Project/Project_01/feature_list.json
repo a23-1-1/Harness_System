@@ -77,8 +77,8 @@
       "name": "性能优化 & 生产部署",
       "description": "Redis 缓存策略调优（TTL/淘汰/冷热分离）；PG 分表 + 连接池；速率限制（Redis Sorted Set）；Docker Compose 一键部署；前端体积优化（< 400KB）；AI 审计日志",
       "dependencies": ["feat-009"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "done",
+      "evidence": "RateLimitMiddleware（Redis Sorted Set 滑动窗口 60r/60s + 内存级降级）；AI 审计日志（ws_event/llm_call/tool_call/api_request 四类结构化 JSON）；前端代码分割（vendor/charts/ui chunks）、disable sourcemap、rollup-plugin-visualizer；Docker Compose 四容器编排（backend/frontend/postgres/redis）+ 健康检查"
     }
   ]
 }

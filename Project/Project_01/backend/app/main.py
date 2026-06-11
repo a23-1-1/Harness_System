@@ -20,9 +20,10 @@ if env_path.exists():
 
 from app.ws.manager import ConnectionManager, ws_manager
 from app.ws.rooms import room_manager
-from app.database import init_db
+from app.database import engine, init_db
 from app.redis_cache import redis_cache
 from app.mcp.servers import register_all_tools
+from app.middleware.ratelimit import RateLimitMiddleware
 
 load_dotenv()
 
@@ -93,13 +94,22 @@ app = FastAPI(
 )
 
 # CORS — WebSocket 不受此影响（WebSocket 握手不走 CORS 中间件）
-origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+origins_raw = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
+origins = [o.strip() for o in origins_raw.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# 速率限制中间件（对 API 路由生效，Redis 不可用时降级为内存限流）
+app.add_middleware(
+    RateLimitMiddleware,
+    limit=60,
+    window=60,
+    routes=["/api/"],
 )
 
 
@@ -122,34 +132,81 @@ async def log_requests(request: Request, call_next):
             "duration_ms": round(duration),
         }},
     )
+    # AI 审计日志（非 WebSocket 请求，跳过健康检查避免日志洪泛）
+    if request.url.path != "/api/v5/health":
+        try:
+            from app.middleware.audit import log_api_request
+            client_ip = request.client.host if request.client else ""
+            log_api_request(request.method, request.url.path, response.status_code, duration, client_ip)
+        except Exception:
+            pass
     return response
 
 
 # ─── 路由注册 ────────────────────────────────────────────────
 from app.routes import conversations  # noqa: E402
 from app.routes import students  # noqa: E402
+from app.routes import demos  # noqa: E402
+from app.routes import teacher  # noqa: E402
+from app.routes import curriculum  # noqa: E402
 from app.ws import handlers  # noqa: E402
 
 app.include_router(conversations.router, prefix="/api/v5")
 app.include_router(handlers.router)
 app.include_router(students.router, prefix="/api/v5")
+app.include_router(demos.router, prefix="/api/v5")
+app.include_router(teacher.router, prefix="/api/v5")
+app.include_router(curriculum.router, prefix="/api/v5")
 
 
 # ─── 健康检查 ────────────────────────────────────────────────
 @app.get("/api/v5/health")
-async def health_check():
-    """健康检查端点"""
-    redis_ok = "unknown"
+async def health_check(deep: bool = False):
+    """健康检查端点（deep=1 时额外探测 LLM API）"""
+    redis_ok = "disconnected"
     try:
+        redis_cache.reset_client()
         client = await redis_cache.get_client()
-        await client.ping()
-        redis_ok = "connected"
+        if client is not None:
+            await client.ping()
+            redis_ok = "connected"
     except Exception:
         redis_ok = "disconnected"
+
+    pg_ok = "disconnected"
+    try:
+        from sqlalchemy import text
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT 1"))
+        pg_ok = "connected"
+    except Exception:
+        pg_ok = "disconnected"
+
+    openai_sdk = "installed"
+    try:
+        import openai  # noqa: F401
+    except ImportError:
+        openai_sdk = "missing"
+
+    from app.llm.gateway import llm_gateway
+    llm_info = llm_gateway.config_status()
+    llm_info["openai_sdk"] = openai_sdk
+    if deep:
+        llm_info = await llm_gateway.ping()
+
+    overall = "ok"
+    if redis_ok != "connected" or pg_ok != "connected":
+        overall = "degraded"
+    if llm_info.get("status") not in ("ready", "ok") and llm_info.get("ping") == "error":
+        overall = "degraded"
+
     return {
-        "status": "ok",
+        "status": overall,
         "service": "db-demo-studio",
         "version": "0.1.0",
         "redis": redis_ok,
+        "pg": pg_ok,
+        "llm": llm_info,
+        "providers": llm_info.get("providers", {}),
         "timestamp": datetime.now(tz=timezone.utc).isoformat(),
     }

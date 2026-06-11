@@ -1,35 +1,26 @@
-#!/bin/bash
-# ═══════════════════════════════════════════════════════════════
-# docker-compose.yml — DB Demo Studio 完整部署方案
-# ═══════════════════════════════════════════════════════════════
-# 使用方式：
-#   docker compose up -d              # 启动所有服务
-#   docker compose up -d --build      # 重新构建镜像并启动
-#   docker compose down               # 停止所有服务
-#   docker compose logs -f            # 查看所有日志
-# ═══════════════════════════════════════════════════════════════
+# docker-compose.yml - DB Demo Studio full deployment
+# Usage:
+#   docker compose up -d
+#   docker compose up -d --build
+#   docker compose down
+#   docker compose logs -f
 
-version: "3.9"
-
-# ─── 共享网络 ──────────────────────────────────────────────────
 networks:
   db-demo-network:
     driver: bridge
     name: db-demo-network
 
-# ─── 数据卷 ────────────────────────────────────────────────────
 volumes:
   postgres-data:
     name: db-demo-postgres-data
   redis-data:
     name: db-demo-redis-data
+  mysql-explain-data:
+    name: db-demo-mysql-explain-data
+  pgexplain-data:
+    name: db-demo-pgexplain-data
 
-# ─── 服务 ──────────────────────────────────────────────────────
 services:
-
-  # ═════════════════════════════════════════════════════════════
-  # 1. PostgreSQL 16 — 主存储 + pgvector
-  # ═════════════════════════════════════════════════════════════
   postgres:
     image: pgvector/pgvector:0.8.0-pg16
     container_name: db-demo-postgres
@@ -58,9 +49,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ═════════════════════════════════════════════════════════════
-  # 2. Redis 7+ — 会话缓存 / Pub/Sub / LLM Cache / 限流
-  # ═════════════════════════════════════════════════════════════
   redis:
     image: redis:7-alpine
     container_name: db-demo-redis
@@ -87,9 +75,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ═════════════════════════════════════════════════════════════
-  # 3. FastAPI 后端
-  # ═════════════════════════════════════════════════════════════
   backend:
     build:
       context: ./backend
@@ -105,21 +90,18 @@ services:
     env_file:
       - .env
     environment:
-      # 容器内使用服务名连接，而非 localhost
       DATABASE_URL: postgresql+asyncpg://${PG_USER:-dbdemo}:${PG_PASSWORD:-dbdemo_pass}@postgres:5432/${PG_DATABASE:-db_demo_studio}
       REDIS_URL: redis://redis:6379/0
       REDIS_HOST: redis
       REDIS_PORT: 6379
       PG_HOST: postgres
       PG_PORT: 5432
-      # EXPLAIN 引擎（Linux 部署时改为主机 IP）
-      MYSQL_HOST: ${MYSQL_HOST:-host.docker.internal}
-      PG_EXPLAIN_HOST: ${PG_EXPLAIN_HOST:-host.docker.internal}
-      # LLM
-      CLAUDE_API_KEY: ${CLAUDE_API_KEY:-}
+      MYSQL_HOST: mysql-explain
+      PG_EXPLAIN_HOST: pgexplain
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      LLM_PROVIDER: ${LLM_PROVIDER:-claude}
-      # 应用配置
+      SILICONFLOW_API_KEY: ${SILICONFLOW_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
+      LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
       APP_ENV: ${APP_ENV:-production}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:80}
       TZ: Asia/Shanghai
@@ -129,7 +111,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v5/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v5/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -140,13 +122,66 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ═════════════════════════════════════════════════════════════
-  # 4. React 19 前端（Nginx 托管）
-  # ═════════════════════════════════════════════════════════════
+  mysql-explain:
+    image: mysql:8.0
+    container_name: db-demo-mysql-explain
+    restart: unless-stopped
+    networks:
+      - db-demo-network
+    ports:
+      - "${MYSQL_PORT:-3308}:3306"
+    volumes:
+      - mysql-explain-data:/var/lib/mysql
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: explain_test
+      TZ: Asia/Shanghai
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --log-bin-trust-function-creators=1
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  pgexplain:
+    image: pgvector/pgvector:0.8.0-pg16
+    container_name: db-demo-pgexplain
+    restart: unless-stopped
+    networks:
+      - db-demo-network
+    ports:
+      - "${PG_EXPLAIN_PORT:-5433}:5432"
+    volumes:
+      - pgexplain-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: explain
+      POSTGRES_PASSWORD: explain_pass
+      POSTGRES_DB: explain_test
+      TZ: Asia/Shanghai
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U explain -d explain_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   frontend:
     build:
-      context: ./frontend
-      dockerfile: ../docker/frontend/Dockerfile
+      context: .
+      dockerfile: docker/frontend/Dockerfile
       args:
         - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
         - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:8000/ws}

@@ -18,11 +18,11 @@ ENV VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
 ENV VITE_WS_URL=${VITE_WS_URL:-ws://localhost:8000/ws}
 
 # 先复制依赖配置 → 利用 Docker 缓存层加速
-COPY package.json pnpm-lock.yaml* ./
+COPY frontend/package.json frontend/pnpm-lock.yaml* ./
 RUN npm install -g pnpm && pnpm install --frozen-lockfile
 
 # 复制源码并构建
-COPY . .
+COPY frontend/ .
 RUN pnpm build
 
 # ─── Stage 2: 运行（Nginx） ───────────────────────────────────

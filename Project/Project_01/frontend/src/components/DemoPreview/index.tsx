@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Boxes,
   CheckCircle2,
@@ -6,7 +6,10 @@ import {
   ChevronRight,
   Download,
   Film,
+  FileText,
   Layers,
+  Maximize2,
+  Minimize2,
   PanelRightClose,
   PanelRightOpen,
   Pause,
@@ -17,6 +20,7 @@ import {
   Square,
 } from "lucide-react";
 import type { DemoComplete, DemoStep } from "../../types";
+import { normalizeDemoSteps } from "../../utils/demoNormalize";
 
 // Mermaid 模块级单例——避免每渲染动态 import 和重新初始化（#7）
 let mermaidPromise: Promise<any> | null = null;
@@ -37,19 +41,25 @@ function getMermaid() {
 
 import SimulatorPreview from "./SimulatorPreview";
 
+type PanelSize = 0 | 1 | 2;
+
 interface Props {
   demo: DemoComplete | null;
+  panelSize?: PanelSize;
+  isWide?: boolean;
+  onToggleWide?: () => void;
   onCollapse?: () => void;
-  onExport?: () => void;
+  onExport?: (format?: string) => void;
   onRegenerate?: (stepIndex: number, instructions: string) => void;
   onSimulatorUpdate?: (simulatorType: string, params: Record<string, unknown>) => void;
 }
 
-type Tab = "flow" | "play" | "assets" | "simulator";
+type Tab = "flow" | "play" | "page" | "assets" | "simulator";
 
 const TABS: { key: Tab; label: string; icon: typeof Layers }[] = [
   { key: "flow", label: "流程", icon: Route },
   { key: "play", label: "播放", icon: Play },
+  { key: "page", label: "页面", icon: FileText },
   { key: "simulator", label: "模拟", icon: Layers },
   { key: "assets", label: "素材", icon: Boxes },
 ];
@@ -57,12 +67,30 @@ const TABS: { key: Tab; label: string; icon: typeof Layers }[] = [
 const STAGE_LABELS = ["词法分析", "语法解析", "查询优化", "执行计划", "执行过程", "结果分析"];
 const STAGE_KEYS = ["lex", "parse", "optimize", "plan", "execute", "result"];
 
-export default function DemoPreview({ demo, onCollapse, onExport, onRegenerate, onSimulatorUpdate }: Props) {
+export default function DemoPreview({
+  demo,
+  isWide = false,
+  panelSize = isWide ? 1 : 0,
+  onToggleWide,
+  onCollapse,
+  onExport,
+  onRegenerate,
+  onSimulatorUpdate,
+}: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("flow");
   const [activeIndex, setActiveIndex] = useState(0);
   const [autoPlay, setAutoPlay] = useState(false);
   const autoPlayRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showExportNotif, setShowExportNotif] = useState(false);
+  const [exportFormat, setExportFormat] = useState("html");
+  const previewWidthLabel = panelSize >= 2 ? "720px" : panelSize === 1 ? "560px" : "380px";
+  const toggleWideLabel = panelSize >= 2 ? "还原" : panelSize === 1 ? "更宽" : "加宽";
+  const toggleWideTitle =
+    panelSize >= 2
+      ? "恢复标准预览宽度"
+      : panelSize === 1
+        ? "继续向左展开预览栏"
+        : "向左展开预览栏";
 
   // 重置状态当 demo ID 变化时（跳过模拟器参数调整个 demoId=undefined 的情况）
   const prevDemoIdRef = useRef<string | undefined>(undefined);
@@ -75,12 +103,18 @@ export default function DemoPreview({ demo, onCollapse, onExport, onRegenerate, 
     setAutoPlay(false);
   }, [demo?.demoId]);
 
+  const safeSteps = useMemo(() => normalizeDemoSteps(demo?.steps), [demo?.steps]);
+  const safeDemo = useMemo(
+    () => (demo ? { ...demo, steps: safeSteps } : null),
+    [demo, safeSteps],
+  );
+
   // 自动播放逻辑
   useEffect(() => {
     if (autoPlay) {
       autoPlayRef.current = setInterval(() => {
         setActiveIndex((i) => {
-          if (demo && i >= demo.steps.length - 1) {
+          if (safeSteps.length > 0 && i >= safeSteps.length - 1) {
             setAutoPlay(false);
             return i;
           }
@@ -94,28 +128,28 @@ export default function DemoPreview({ demo, onCollapse, onExport, onRegenerate, 
         autoPlayRef.current = null;
       }
     };
-  }, [autoPlay, demo]);
+  }, [autoPlay, safeSteps.length]);
 
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback((fmt?: string) => {
     if (onExport) {
-      onExport();
+      onExport(fmt || exportFormat);
       setShowExportNotif(true);
       setTimeout(() => setShowExportNotif(false), 2000);
     }
-  }, [onExport]);
+  }, [onExport, exportFormat]);
 
   const wrapStep = useCallback((index: number) => {
     setActiveIndex(index);
   }, []);
 
-  const activeStep = demo?.steps[activeIndex] || null;
-  const progress = demo?.steps.length
-    ? Math.round(((activeIndex + 1) / demo.steps.length) * 100)
+  const activeStep = safeSteps[activeIndex] || null;
+  const progress = safeSteps.length
+    ? Math.round(((activeIndex + 1) / safeSteps.length) * 100)
     : 0;
 
   const goPrev = () => setActiveIndex((i) => Math.max(0, i - 1));
   const goNext = () =>
-    setActiveIndex((i) => Math.min((demo?.steps.length || 1) - 1, i + 1));
+    setActiveIndex((i) => Math.min((safeSteps.length || 1) - 1, i + 1));
 
   const toggleAutoPlay = () => {
     if (autoPlay) {
@@ -127,7 +161,16 @@ export default function DemoPreview({ demo, onCollapse, onExport, onRegenerate, 
     }
   };
 
-  if (!demo) return <EmptyState onCollapse={onCollapse} />;
+  if (!safeDemo) {
+    return (
+      <EmptyState
+        panelSize={panelSize}
+        isWide={isWide}
+        onToggleWide={onToggleWide}
+        onCollapse={onCollapse}
+      />
+    );
+  }
 
   return (
     <div className="flex h-full flex-col bg-white text-slate-900">
@@ -140,9 +183,23 @@ export default function DemoPreview({ demo, onCollapse, onExport, onRegenerate, 
             <p className="text-sm font-semibold text-slate-900">演示预览</p>
           </div>
           <div className="flex items-center gap-1.5">
+            {onToggleWide && (
+              <button
+                type="button"
+                onClick={onToggleWide}
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-2.5 text-xs font-semibold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50"
+                title={toggleWideTitle}
+              >
+                {panelSize >= 2 ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                <span>{toggleWideLabel}</span>
+                <span className="rounded bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] text-blue-600">
+                  {previewWidthLabel}
+                </span>
+              </button>
+            )}
             <button
               type="button"
-              onClick={handleExport}
+              onClick={() => handleExport()}
               className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
               title="导出演示"
             >
@@ -165,7 +222,7 @@ export default function DemoPreview({ demo, onCollapse, onExport, onRegenerate, 
             导出请求已发送，检查消息列表查看结果
           </div>
         )}
-        <div className="flex rounded-lg bg-white p-1 shadow-sm ring-1 ring-slate-200">
+        <div className="flex overflow-x-auto rounded-lg bg-white p-1 shadow-sm ring-1 ring-slate-200">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.key;
@@ -173,7 +230,7 @@ export default function DemoPreview({ demo, onCollapse, onExport, onRegenerate, 
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold transition ${
+                className={`flex flex-shrink-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-2 text-xs font-semibold transition sm:px-3 ${
                   active
                     ? "bg-blue-600 text-white shadow-sm"
                     : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
@@ -194,9 +251,9 @@ export default function DemoPreview({ demo, onCollapse, onExport, onRegenerate, 
               Live Demo Console
             </p>
             <h2 className="mt-2 line-clamp-2 text-lg font-semibold tracking-tight">
-              {demo.title}
+              {safeDemo.title}
             </h2>
-            <p className="mt-2 font-mono text-[10px] text-slate-500">{demo.demoId}</p>
+            <p className="mt-2 font-mono text-[10px] text-slate-500">{safeDemo.demoId}</p>
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
             <CheckCircle2 className="h-3.5 w-3.5" />
@@ -207,7 +264,7 @@ export default function DemoPreview({ demo, onCollapse, onExport, onRegenerate, 
         <div className="mt-5">
           <div className="flex items-center justify-between text-[11px] text-slate-500">
             <span>
-              Step {activeIndex + 1}/{demo.steps.length}
+              Step {activeIndex + 1}/{safeSteps.length}
             </span>
             <span>{progress}%</span>
           </div>
@@ -223,19 +280,27 @@ export default function DemoPreview({ demo, onCollapse, onExport, onRegenerate, 
       <div className="scroll-area min-h-0 flex-1 overflow-y-auto bg-slate-50">
         {activeTab === "flow" && (
           <FlowView
-            steps={demo.steps}
+            steps={safeSteps}
             activeIndex={activeIndex}
             onSelect={wrapStep}
             onRegenerate={onRegenerate}
           />
         )}
         {activeTab === "play" && (
-          <PlayView step={activeStep} activeIndex={activeIndex} total={demo.steps.length} />
+          <PlayView step={activeStep} activeIndex={activeIndex} total={safeSteps.length} />
+        )}
+        {activeTab === "page" && (
+          <PagePreview
+            demo={safeDemo}
+            activeIndex={activeIndex}
+            onSelect={wrapStep}
+            isWide={isWide}
+          />
         )}
         {activeTab === "simulator" && (
-          <SimulatorPreview demo={demo} onSimulatorUpdate={onSimulatorUpdate} />
+          <SimulatorPreview demo={safeDemo} onSimulatorUpdate={onSimulatorUpdate} />
         )}
-        {activeTab === "assets" && <AssetsView stepCount={demo.steps.length} />}
+        {activeTab === "assets" && <AssetsView stepCount={safeSteps.length} />}
       </div>
 
       <div className="border-t border-slate-200 bg-white px-6 py-4">
@@ -264,9 +329,9 @@ export default function DemoPreview({ demo, onCollapse, onExport, onRegenerate, 
             </button>
 
             <div className="flex items-center gap-1.5">
-              {demo.steps.map((step, index) => (
+              {safeSteps.map((step, index) => (
                 <button
-                  key={step.index}
+                  key={`step-dot-${step.index}-${index}`}
                   onClick={() => setActiveIndex(index)}
                   className={`h-2 rounded-full transition-all ${
                     index === activeIndex
@@ -283,7 +348,7 @@ export default function DemoPreview({ demo, onCollapse, onExport, onRegenerate, 
 
           <button
             onClick={goNext}
-            disabled={activeIndex >= demo.steps.length - 1}
+            disabled={activeIndex >= safeSteps.length - 1}
             className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:opacity-100 disabled:shadow-none"
           >
             下一步
@@ -295,7 +360,26 @@ export default function DemoPreview({ demo, onCollapse, onExport, onRegenerate, 
   );
 }
 
-function EmptyState({ onCollapse }: { onCollapse?: () => void }) {
+function EmptyState({
+  isWide = false,
+  panelSize = isWide ? 1 : 0,
+  onToggleWide,
+  onCollapse,
+}: {
+  panelSize?: PanelSize;
+  isWide?: boolean;
+  onToggleWide?: () => void;
+  onCollapse?: () => void;
+}) {
+  const previewWidthLabel = panelSize >= 2 ? "720px" : panelSize === 1 ? "560px" : "380px";
+  const toggleWideLabel = panelSize >= 2 ? "还原" : panelSize === 1 ? "更宽" : "加宽";
+  const toggleWideTitle =
+    panelSize >= 2
+      ? "恢复标准预览宽度"
+      : panelSize === 1
+        ? "继续向左展开预览栏"
+        : "向左展开预览栏";
+
   return (
     <div className="flex h-full flex-col bg-white text-slate-900">
       <div className="border-b border-slate-200 bg-gradient-to-br from-blue-50 to-slate-50 px-6 py-5">
@@ -306,18 +390,34 @@ function EmptyState({ onCollapse }: { onCollapse?: () => void }) {
             </p>
             <p className="text-sm font-semibold text-slate-900">演示预览</p>
           </div>
-          {onCollapse && (
-            <button
-              type="button"
-              onClick={onCollapse}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-              title="折叠右侧栏"
-            >
-              <PanelRightClose className="h-4 w-4" />
-            </button>
-          )}
+          <div className="flex items-center gap-1.5">
+            {onToggleWide && (
+              <button
+                type="button"
+                onClick={onToggleWide}
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-2.5 text-xs font-semibold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50"
+                title={toggleWideTitle}
+              >
+                {panelSize >= 2 ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                <span>{toggleWideLabel}</span>
+                <span className="rounded bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] text-blue-600">
+                  {previewWidthLabel}
+                </span>
+              </button>
+            )}
+            {onCollapse && (
+              <button
+                type="button"
+                onClick={onCollapse}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                title="折叠右侧栏"
+              >
+                <PanelRightClose className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-1 rounded-lg bg-white p-1 shadow-sm ring-1 ring-slate-200">
+        <div className="grid grid-cols-5 gap-1 rounded-lg bg-white p-1 shadow-sm ring-1 ring-slate-200">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -340,7 +440,7 @@ function EmptyState({ onCollapse }: { onCollapse?: () => void }) {
           </div>
           <h3 className="mt-5 text-base font-semibold">等待生成演示</h3>
           <p className="mt-2 text-sm leading-relaxed text-slate-500">
-            中间输入教学目标后，这里会显示流程、播放控制和演示素材。
+            中间输入教学目标后，这里会显示流程、播放控制和页面预览。
           </p>
           <div className="mt-6 grid grid-cols-2 gap-2 text-left">
             {STAGE_LABELS.map((label, index) => (
@@ -383,10 +483,18 @@ function FlowView({
           : "bg-slate-100 text-slate-600 border-slate-200";
         const isRewriting = rewritingStep === index;
         return (
-          <div key={step.index} className="flex flex-col gap-2">
-            <button
+          <div key={`flow-step-${step.index}-${index}`} className="flex flex-col gap-2">
+            <div
+              role="button"
+              tabIndex={0}
               onClick={() => onSelect(index)}
-              className={`group flex w-full gap-3 rounded-lg border p-4 text-left transition ${
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelect(index);
+                }
+              }}
+              className={`group flex w-full cursor-pointer gap-3 rounded-lg border p-4 text-left transition ${
                 active
                   ? "border-blue-200 bg-blue-50 shadow-sm"
                   : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/40"
@@ -430,7 +538,7 @@ function FlowView({
                   <RefreshCw className="h-3 w-3" />
                 </button>
               </div>
-            </button>
+            </div>
             {isRewriting && (
               <div className="ml-11 flex gap-2">
                 <input
@@ -464,6 +572,132 @@ function FlowView({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function PagePreview({
+  demo,
+  activeIndex,
+  onSelect,
+  isWide = false,
+}: {
+  demo: DemoComplete;
+  activeIndex: number;
+  onSelect: (index: number) => void;
+  isWide?: boolean;
+}) {
+  const activeStep = demo.steps[activeIndex] || demo.steps[0] || null;
+
+  return (
+    <div className="bg-slate-100 px-4 py-6 sm:px-6">
+      <article className={`mx-auto overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ${
+        isWide ? "max-w-5xl" : "max-w-3xl"
+      }`}>
+        <section className="border-b border-slate-200 bg-gradient-to-br from-slate-950 via-blue-950 to-blue-800 px-6 py-7 text-white">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-100/80">
+            Page Preview
+          </p>
+          <h3 className="mt-3 text-2xl font-semibold leading-tight">
+            {demo.title}
+          </h3>
+          <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold">
+            <span className="rounded-full bg-white/15 px-3 py-1 text-blue-50 ring-1 ring-white/20">
+              {demo.steps.length} 个讲解步骤
+            </span>
+            <span className="rounded-full bg-white/15 px-3 py-1 text-blue-50 ring-1 ring-white/20">
+              {demo.demo_type || demo.simulator_type || "interactive demo"}
+            </span>
+          </div>
+        </section>
+
+        {activeStep && (
+          <section className="border-b border-slate-200 bg-blue-50 px-6 py-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white">
+                当前讲解 Step {activeIndex + 1}
+              </span>
+              {activeStep.stage && (
+                <span className="text-xs font-semibold text-blue-700">
+                  {STAGE_LABELS[STAGE_KEYS.indexOf(activeStep.stage)] || activeStep.stage}
+                </span>
+              )}
+            </div>
+            <h4 className="mt-4 text-xl font-semibold text-slate-950">{activeStep.title}</h4>
+            <p className="mt-3 text-sm leading-7 text-slate-700">{activeStep.content}</p>
+            {activeStep.mermaid && (
+              <div className="mt-4 rounded-xl border border-blue-100 bg-white p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold text-slate-700">课堂图示</span>
+                  <span className="font-mono text-[10px] text-slate-400">
+                    {activeStep.mermaid_type || "mermaid"}
+                  </span>
+                </div>
+                <MermaidRenderer code={activeStep.mermaid} />
+              </div>
+            )}
+            {activeStep.interactive_hint && (
+              <p className="mt-4 rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm font-medium text-blue-700">
+                课堂互动：{activeStep.interactive_hint}
+              </p>
+            )}
+          </section>
+        )}
+
+        <section className="space-y-4 px-6 py-6">
+          {demo.steps.map((step, index) => {
+            const active = index === activeIndex;
+            const stageLabel = step.stage
+              ? STAGE_LABELS[STAGE_KEYS.indexOf(step.stage)] || step.stage
+              : `步骤 ${index + 1}`;
+
+            return (
+              <button
+                key={`page-step-${step.index}-${index}`}
+                type="button"
+                onClick={() => onSelect(index)}
+                className={`block w-full rounded-2xl border p-4 text-left transition ${
+                  active
+                    ? "border-blue-300 bg-blue-50 shadow-sm"
+                    : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"
+                }`}
+              >
+                <div className="flex items-start gap-4">
+                  <span
+                    className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                      active ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {index + 1}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-base font-semibold text-slate-950">{step.title}</span>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500">
+                        {stageLabel}
+                      </span>
+                    </span>
+                    <span className="mt-2 block text-sm leading-7 text-slate-600">
+                      {step.content}
+                    </span>
+                    {step.mermaid && (
+                      <span className="mt-3 block rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <span className="mb-3 flex items-center justify-between gap-3">
+                          <span className="text-xs font-semibold text-slate-700">步骤图示</span>
+                          <span className="font-mono text-[10px] text-slate-400">
+                            {step.mermaid_type || "mermaid"}
+                          </span>
+                        </span>
+                        <MermaidRenderer code={step.mermaid} />
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </section>
+      </article>
     </div>
   );
 }

@@ -5,29 +5,41 @@
 
 ## Current State
 
-**Last Updated:** 2026-06-09
-**Session ID:** 006
-**Active Feature:** feat-006 — 对话式测验 & 教学闭环
+**Last Updated:** 2026-06-10
+**Session ID:** 010
+**Active Feature:** feat-010 — 性能优化 & 生产部署
 
 ## Status
 
 ### What's Done
 
-#### feat-001 ~ feat-005 / feat-007 ✅（全部完成）
+#### feat-001 ~ feat-009 ✅（全部完成）
 - 见 progress.md 历史记录及此前会话
 
-#### feat-009 课纲 RAG & 教师风格学习 ✅（已全部完成）
+#### feat-010 性能优化 & 生产部署 ✅（已全部完成）
 
-- [x] **TeacherProfile 模型** (`backend/app/models/teacher.py` — 新建)
-  - PG 表（teacher_id PK，style/preferences/teaching_subjects JSON 字段）
-  - Redis 缓存（1h TTL），被 init_db 自动发现
+- [x] **Redis 速率限制中间件** (`backend/app/middleware/ratelimit.py` — 新建)
+  - `RateLimitMiddleware` — FastAPI 中间件，对 `/api/` 路由生效（默认 60 请求/60s 窗口）
+  - Redis Sorted Set 滑动窗口（`ratelimit:{ip}:{path}`）
+  - Redis 不可用时降级为内存级限流（`asyncio.Lock` 保护）
 
-- [x] **教师 Profile REST API** (`backend/app/routes/teacher.py` — 新建)
-  - `GET /api/v5/teacher/profile?teacher_id=default` — 读取风格配置（Redis → PG → 默认值三级回退）
-  - `POST /api/v5/teacher/profile` — 保存风格配置，清除缓存
-  - API 前缀与 CLAUDE.md 文档一致
+- [x] **AI 审计日志** (`backend/app/middleware/audit.py` — 新建)
+  - `log_ws_event()` — WebSocket 事件审计
+  - `log_llm_call()` — LLM 调用审计（provider/model/tokens/success）
+  - `log_tool_call()` — MCP 工具调用审计
+  - `log_api_request()` — REST API 请求审计（main.py 中间件集成）
 
-- [x] **教师风格自动学习** (`backend/app/agents/orchestrator.py`)
+- [x] **前端体积优化** (`frontend/vite.config.ts`)
+  - 代码分割：`vendor`（React/ReactDOM）、`charts`（D3/Mermaid）、`ui`（Lucide）
+  - 禁用 sourcemap、chunkSizeWarningLimit 200KB
+  - 集成 rollup-plugin-visualizer 用于体积分析
+
+- [x] **Docker Compose 生产部署**（已有 `docker-compose.yml`）
+  - backend/frontend/postgres/redis 四容器编排
+  - 健康检查、依赖顺序、日志轮转
+  - TZ 配置、环境变量注入
+
+- [x] **进度文档更新** — progress.md + feature_list.json
   - `_load_teacher_profile()` — 每次 `process_message` 自动加载 Profile
   - `_infer_style_from_edit()` — 从 `step:regenerate` 操作推断偏好（篇幅/正式度/举例倾向）
   - `_update_style_from_edit()` — 异步更新 Profile 到 PG + 刷新 Redis 缓存（不阻塞 AI 生成）

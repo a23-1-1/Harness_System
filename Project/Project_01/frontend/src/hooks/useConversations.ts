@@ -7,12 +7,16 @@ import type { Conversation } from "../types";
 export function useConversations() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
 
-  const fetchList = async () => {
+  const fetchList = async (q = "", page = 1, limit = 50) => {
     try {
-      const res = await fetch("/api/v5/conversations");
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (q) params.set("q", q);
+      const res = await fetch(`/api/v5/conversations?${params}`);
       const data = await res.json();
       setConversations(data.conversations || []);
+      setTotal(data.total ?? 0);
     } catch (err) {
       console.error("获取对话列表失败:", err);
     } finally {
@@ -23,6 +27,11 @@ export function useConversations() {
   useEffect(() => {
     fetchList();
   }, []);
+
+  const search = async (q: string) => {
+    setLoading(true);
+    await fetchList(q);
+  };
 
   const create = async (title?: string) => {
     const res = await fetch("/api/v5/conversations", {
@@ -50,5 +59,18 @@ export function useConversations() {
     setConversations((prev) => prev.map((c) => (c.id === id ? updated : c)));
   };
 
-  return { conversations, loading, create, remove, rename };
+  const copy = async (id: string, title?: string, modifications?: string) => {
+    const res = await fetch(`/api/v5/demos/${id}/copy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: title || "", modifications: modifications || "" }),
+    });
+    const data = await res.json();
+    if (data.conversation) {
+      setConversations((prev) => [data.conversation, ...prev]);
+    }
+    return data.conversation;
+  };
+
+  return { conversations, total, loading, search, create, remove, rename, copy };
 }

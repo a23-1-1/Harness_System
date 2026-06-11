@@ -78,6 +78,24 @@ const EVENT_META: Record<
     border: "border-emerald-200",
     text: "text-emerald-700",
   },
+  "demo:updated": {
+    label: "演示已更新",
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+    text: "text-emerald-700",
+  },
+  "simulator:update": {
+    label: "模拟器更新",
+    bg: "bg-violet-50",
+    border: "border-violet-200",
+    text: "text-violet-700",
+  },
+  error: {
+    label: "操作未完成",
+    bg: "bg-red-50",
+    border: "border-red-200",
+    text: "text-red-700",
+  },
 };
 
 export default function ChatPanel({
@@ -163,7 +181,7 @@ export default function ChatPanel({
         </div>
       </div>
 
-      <div className="scroll-area min-h-0 flex-1 overflow-y-auto px-10 pb-52 pt-8">
+      <div className="scroll-area min-h-0 flex-1 overflow-y-auto px-5 pt-6 sm:px-8 lg:px-10 lg:pt-8">
         {messages.length === 0 ? (
           <WelcomeView
             onQuickSelect={setInput}
@@ -173,16 +191,17 @@ export default function ChatPanel({
         ) : (
           <div className="space-y-4">
             {messages.map((msg, i) => (
-              <MessageBubble key={`${msg.event}-${i}`} msg={msg} />
+              <MessageBubble key={`${msg.event}-${i}`} msg={msg} onQuizAnswer={onQuizAnswer} />
             ))}
           </div>
         )}
+        <div className="h-[24rem] shrink-0" aria-hidden="true" />
         <div ref={messagesEndRef} />
       </div>
 
       <form
         onSubmit={handleSubmit}
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center bg-gradient-to-t from-[#f8fafc] via-[#f8fafc]/95 to-transparent px-10 pb-7 pt-16"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center bg-gradient-to-t from-[#f8fafc] via-[#f8fafc]/95 to-transparent px-4 pb-5 pt-16 sm:px-8 sm:pb-7 lg:px-10"
       >
         <div className="pointer-events-auto w-full max-w-[820px] overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.16)] transition focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-100">
           <textarea
@@ -191,7 +210,7 @@ export default function ChatPanel({
             onKeyDown={handleKeyDown}
             placeholder="输入 SQL、知识点或教学目标，例如：用动画解释 Hash Join 为什么适合大表等值连接"
             rows={3}
-            className="block max-h-40 min-h-24 w-full resize-none bg-white px-6 py-4 text-base leading-7 text-slate-800 outline-none placeholder:text-slate-400"
+            className="block max-h-40 min-h-24 w-full resize-none bg-white px-5 py-4 text-base leading-7 text-slate-800 outline-none placeholder:text-slate-400 sm:px-6"
           />
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 px-5 py-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -300,7 +319,7 @@ function WelcomeView({
   );
 }
 
-function MessageBubble({ msg }: { msg: WsMessage }) {
+function MessageBubble({ msg, onQuizAnswer }: { msg: WsMessage; onQuizAnswer?: (questionId: string, answer: string, question: Record<string, unknown>) => void }) {
   const payload = msg.payload as Record<string, unknown>;
   const content =
     typeof payload.content === "string"
@@ -313,9 +332,9 @@ function MessageBubble({ msg }: { msg: WsMessage }) {
     return (
       <div className="flex justify-end">
         <div className="max-w-[82%] rounded-3xl rounded-tr-md bg-blue-600 px-4 py-3 text-base leading-relaxed text-white shadow-lg shadow-blue-600/15">
-          <pre className="whitespace-pre-wrap font-sans">
-            {content || JSON.stringify(payload, null, 2)}
-          </pre>
+          <p className="whitespace-pre-wrap break-words">
+            {content || "已发送请求，正在处理。"}
+          </p>
         </div>
       </div>
     );
@@ -368,9 +387,11 @@ function MessageBubble({ msg }: { msg: WsMessage }) {
           </div>
         )}
         <div
-          className={`rounded-3xl border px-4 py-3 text-base leading-relaxed ${
+          className={`rounded-3xl border px-4 py-3 text-base leading-relaxed shadow-sm ${
             msg.event === "demo:complete" && payload.steps
               ? "border-emerald-200 bg-emerald-50"
+              : msg.event === "demo:updated"
+                ? "border-emerald-200 bg-emerald-50"
               : msg.event === "quiz:generated"
                 ? "border-violet-200 bg-violet-50"
                 : msg.event === "quiz:result"
@@ -382,8 +403,10 @@ function MessageBubble({ msg }: { msg: WsMessage }) {
                     : "border-slate-200 bg-white text-slate-900"
           }`}
         >
-          {msg.event === "demo:complete" && payload.steps ? (
+          {msg.event === "demo:complete" && Array.isArray(payload.steps) ? (
             <DemoCompleteMessage payload={payload as DemoPayload} />
+          ) : msg.event === "demo:updated" ? (
+            <SystemEventMessage event={msg.event} payload={payload} content="右侧演示预览已同步最新参数。" />
           ) : msg.event === "quiz:generated" ? (
             <QuizMessage payload={payload as Record<string, unknown>} onQuizAnswer={onQuizAnswer} />
           ) : msg.event === "quiz:result" ? (
@@ -391,9 +414,7 @@ function MessageBubble({ msg }: { msg: WsMessage }) {
           ) : (msg.event === "step:preview" || msg.event === "step:regenerated") && payload.title ? (
             <StepPreviewMessage event={msg.event} payload={payload as Record<string, unknown>} />
           ) : (
-            <pre className="whitespace-pre-wrap font-sans text-slate-800">
-              {content || JSON.stringify(payload, null, 2)}
-            </pre>
+            <SystemEventMessage event={msg.event} payload={payload} content={content} />
           )}
         </div>
       </div>
@@ -408,33 +429,21 @@ function DemoCompleteMessage({ payload }: { payload: DemoPayload }) {
     <div>
       <p className="font-semibold text-slate-800">{payload.title || "演示已生成"}</p>
       <p className="mt-1 text-sm text-emerald-700">
-        已生成 {steps.length} 个步骤，右侧控制台可查看和播放。
+        已生成 {steps.length} 个步骤，完整流程、播放控制和可视化素材已同步到右侧预览。
       </p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {steps.slice(0, 4).map((step) => (
-          <span
-            key={step.index}
-            className="rounded-xl border border-emerald-100 bg-white px-3 py-1 text-sm font-medium text-emerald-700 shadow-sm"
-          >
-            {step.index}. {step.title}
-          </span>
-        ))}
-        {steps.length > 4 && (
-          <span className="px-2 py-1 text-xs text-slate-400">
-            +{steps.length - 4} 步
-          </span>
-        )}
-      </div>
+      <p className="mt-3 inline-flex rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-semibold text-emerald-700">
+        请在右侧 Demo Preview 播放和调整
+      </p>
     </div>
   );
 }
 
 function StepPreviewMessage({ event, payload }: { event: string; payload: Record<string, unknown> }) {
   const title = payload.title as string;
-  const content = payload.content as string;
   const stage = payload.stage as string;
   const stageLabel = payload.stageLabel as string;
   const isRegenerated = event === "step:regenerated";
+  const stepIndex = typeof payload.stepIndex === "number" ? payload.stepIndex : undefined;
 
   const stageBadge = stageLabel
     ? stageLabel
@@ -446,8 +455,7 @@ function StepPreviewMessage({ event, payload }: { event: string; payload: Record
     <div>
       <div className="flex items-center gap-2">
         <p className={`text-sm font-semibold ${isRegenerated ? "text-amber-800" : "text-blue-800"}`}>
-          {isRegenerated ? "🔄 " : ""}
-          {title}
+          {isRegenerated ? "步骤已重写" : "步骤已生成"}
         </p>
         {stageBadge && (
           <span className="rounded-full border border-blue-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-blue-600">
@@ -455,7 +463,39 @@ function StepPreviewMessage({ event, payload }: { event: string; payload: Record
           </span>
         )}
       </div>
-      <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{content}</p>
+      <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+        {stepIndex ? `第 ${stepIndex} 步` : "当前步骤"}「{title}」已同步到右侧预览区。
+      </p>
+    </div>
+  );
+}
+
+function SystemEventMessage({
+  event,
+  payload,
+  content,
+}: {
+  event: string;
+  payload: Record<string, unknown>;
+  content: string;
+}) {
+  const code = typeof payload.code === "string" ? payload.code : "";
+  const message = typeof payload.message === "string" ? payload.message : content;
+  const isError = event === "error";
+
+  return (
+    <div>
+      <p className={`text-sm font-semibold ${isError ? "text-red-700" : "text-slate-800"}`}>
+        {isError ? "操作未完成" : EVENT_META[event]?.label || "系统事件"}
+      </p>
+      <p className={`mt-1.5 text-sm leading-relaxed ${isError ? "text-red-700" : "text-slate-600"}`}>
+        {message || "系统已收到事件并完成同步，详细内容会在对应面板中展示。"}
+      </p>
+      {code && (
+        <span className="mt-2 inline-flex rounded-full border border-red-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-red-600">
+          {code}
+        </span>
+      )}
     </div>
   );
 }

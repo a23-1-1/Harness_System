@@ -16,17 +16,27 @@ from app.redis_cache import redis_cache
 logger = logging.getLogger(__name__)
 
 # ─── 配置 ────────────────────────────────────────────────────
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "deepseek")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "deepseek").strip().lower()
+LLM_MODEL = os.getenv("LLM_MODEL", "").strip()
 
 # SiliconFlow（备选，国内可直连）
 SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY", "")
 SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1"
-SILICONFLOW_MODEL = os.getenv("LLM_MODEL", "deepseek-ai/DeepSeek-V3-0324")
+SILICONFLOW_DEFAULT_MODEL = "deepseek-ai/DeepSeek-V3-0324"
+SILICONFLOW_MODEL = LLM_MODEL or SILICONFLOW_DEFAULT_MODEL
 
 # DeepSeek 官方（默认）
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
-DEEPSEEK_MODEL = os.getenv("LLM_MODEL", "deepseek-chat")
+DEEPSEEK_DEFAULT_MODEL = "deepseek-chat"
+DEEPSEEK_MODEL = LLM_MODEL or DEEPSEEK_DEFAULT_MODEL
+DEEPSEEK_SUPPORTED_MODELS = {"deepseek-chat", "deepseek-reasoner"}
+DEEPSEEK_MODEL_ALIASES = {
+    "deepseek-v4": "deepseek-chat",
+    "deepseek-v3": "deepseek-chat",
+    "deepseek-ai/deepseek-v3": "deepseek-chat",
+    "deepseek-ai/deepseek-v3-0324": "deepseek-chat",
+}
 
 # 系统 Prompt
 SYSTEM_PROMPT = """你是一个数据库课程教学助手——DB Demo Studio 的 AI 核心。
@@ -34,7 +44,7 @@ SYSTEM_PROMPT = """你是一个数据库课程教学助手——DB Demo Studio �
 
 ## 输出格式
 
-请始终以 JSON 格式输出：
+请始终以 JSON 格式输出。JSON 仅作为 DB Demo Studio 前后端内部解析协议，不是面向教师展示的聊天内容；真正的用户界面会把 title、steps、mermaid、simConfig 等字段渲染为状态卡、演示预览和播放流程。
 
 ```json
 {
@@ -158,7 +168,8 @@ class LLMGateway:
                 raise ValueError(f"不支持的 LLM Provider: {LLM_PROVIDER}")
 
             if not api_key:
-                raise ValueError(f"{LLM_PROVIDER} API Key 未配置，请在 .env 中设置对应的 API Key")
+                env_name = "SILICONFLOW_API_KEY" if LLM_PROVIDER == "siliconflow" else "DEEPSEEK_API_KEY"
+                raise ValueError(f"{env_name} 未配置或为空，请在 .env 中设置有效 API Key 后重启后端")
 
             self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         return self._client
@@ -166,7 +177,74 @@ class LLMGateway:
     def _get_model(self) -> str:
         if LLM_PROVIDER == "siliconflow":
             return SILICONFLOW_MODEL
-        return DEEPSEEK_MODEL
+        if LLM_PROVIDER != "deepseek":
+            raise ValueError(f"不支持的 LLM Provider: {LLM_PROVIDER}")
+
+        model = DEEPSEEK_MODEL.strip() or DEEPSEEK_DEFAULT_MODEL
+        normalized = DEEPSEEK_MODEL_ALIASES.get(model.lower(), model.lower())
+        if normalized != model:
+            logger.warning(
+                "DeepSeek 官方 Provider 不支持当前 LLM_MODEL，已自动改用 deepseek-chat",
+                extra={"data": {"configuredModel": model, "normalizedModel": normalized}},
+            )
+        if normalized not in DEEPSEEK_SUPPORTED_MODELS:
+            logger.warning(
+                "DeepSeek 官方 Provider 收到未知模型名，已自动改用 deepseek-chat",
+                extra={"data": {
+                    "configuredModel": model,
+                    "normalizedModel": DEEPSEEK_DEFAULT_MODEL,
+                    "supportedModels": sorted(DEEPSEEK_SUPPORTED_MODELS),
+                }},
+            )
+            return DEEPSEEK_DEFAULT_MODEL
+        return normalized
+
+    def _fallback_demo(self, user_input: str, reason: str) -> dict:
+        """LLM 不可用时返回结构化降级演示，避免前端展示原始异常。"""
+        safe_reason = self._friendly_error_reason(reason)
+        try:
+            model_hint = self._get_model()
+        except ValueError:
+            model_hint = LLM_MODEL or "(未设置)"
+        provider_hint = f"当前 Provider: {LLM_PROVIDER}, Model: {model_hint}"
+        needs_config = "API Key" in safe_reason or "未配置" in safe_reason or "无效" in safe_reason
+        return {
+            "title": "AI 服务配置需要检查" if needs_config else "演示生成暂时降级",
+            "status": "fallback",
+            "error_message": safe_reason,
+            "steps": [
+                {
+                    "index": 1,
+                    "stage": "analyze",
+                    "title": "理解输入",
+                    "content": f"已收到您的输入：{user_input[:80]}。系统已完成基础意图识别。",
+                },
+                {
+                    "index": 2,
+                    "stage": "fallback",
+                    "title": "AI 调用未完成",
+                    "content": f"LLM API 调用未成功，已切换为降级响应。原因：{safe_reason}。",
+                },
+                {
+                    "index": 3,
+                    "stage": "config",
+                    "title": "检查配置",
+                    "content": f"请确认 .env 中的 API Key、Provider 和模型名配置正确。DeepSeek 官方 Provider 推荐 LLM_MODEL=deepseek-chat；SiliconFlow 可使用 {SILICONFLOW_DEFAULT_MODEL}。{provider_hint}。",
+                },
+            ],
+        }
+
+    @staticmethod
+    def _friendly_error_reason(reason: str) -> str:
+        """把 SDK/HTTP 异常压缩成适合展示在降级演示中的原因。"""
+        lowered = reason.lower()
+        if "api key" in lowered or "unauthorized" in lowered or "401" in lowered:
+            return "API Key 缺失或无效，请设置有效的 DEEPSEEK_API_KEY 或 SILICONFLOW_API_KEY。"
+        if "model" in lowered and ("not found" in lowered or "invalid" in lowered or "does not exist" in lowered):
+            return "模型名无效。DeepSeek 官方 Provider 请使用 deepseek-chat 或 deepseek-reasoner。"
+        if "未配置" in reason:
+            return reason
+        return reason[:160]
 
     async def generate_demo(self, user_input: str, conv_id: str,
                             teacher_profile: Optional[dict] = None,
@@ -233,14 +311,7 @@ class LLMGateway:
 
         except Exception as e:
             logger.error(f"LLM 调用失败: {e}", extra={"data": {"convId": conv_id}})
-            # 失败时返回降级演示
-            return {
-                "steps": [
-                    {"index": 1, "title": "理解输入", "content": f"分析您的输入: {user_input[:50]}..."},
-                    {"index": 2, "title": "构造步骤", "content": "AI 正在尝试生成演示，但 API 调用出现异常。"},
-                    {"index": 3, "title": "降级响应", "content": f"请检查 API Key 配置是否正确（当前 Provider: {LLM_PROVIDER}）。"},
-                ]
-            }
+            return self._fallback_demo(user_input, str(e))
 
     async def chat_with_json(self, prompt: str) -> str:
         """对话接口，强制 JSON 输出（用于步骤重写等子任务）"""
@@ -278,6 +349,51 @@ class LLMGateway:
         """生成缓存 key"""
         raw = json.dumps(messages, ensure_ascii=False, sort_keys=True)
         return hashlib.sha256(raw.encode()).hexdigest()[:32]
+
+    def config_status(self) -> dict:
+        """同步配置探测（供 /api/v5/health 使用，不发起 API 调用）"""
+        providers = {
+            "deepseek": "configured" if DEEPSEEK_API_KEY else "missing_key",
+            "siliconflow": "configured" if SILICONFLOW_API_KEY else "missing_key",
+        }
+        try:
+            model = self._get_model()
+        except ValueError as exc:
+            return {
+                "provider": LLM_PROVIDER,
+                "status": "misconfigured",
+                "error": str(exc),
+                "providers": providers,
+            }
+        active = providers.get(LLM_PROVIDER, "unknown")
+        return {
+            "provider": LLM_PROVIDER,
+            "model": model,
+            "status": "ready" if active == "configured" else "missing_key",
+            "providers": providers,
+        }
+
+    async def ping(self) -> dict:
+        """轻量 LLM 连通性探测（max_tokens=5）"""
+        status = self.config_status()
+        if status.get("status") != "ready":
+            return {**status, "ping": "skipped"}
+        try:
+            client = self._get_client()
+            response = await client.chat.completions.create(
+                model=status["model"],
+                messages=[{"role": "user", "content": "reply ok"}],
+                max_tokens=5,
+            )
+            content = (response.choices[0].message.content or "").strip()
+            return {
+                **status,
+                "ping": "ok",
+                "sample": content[:32],
+                "tokens": response.usage.total_tokens if response.usage else 0,
+            }
+        except Exception as exc:
+            return {**status, "ping": "error", "error": str(exc)[:160]}
 
 
 # 全局单例

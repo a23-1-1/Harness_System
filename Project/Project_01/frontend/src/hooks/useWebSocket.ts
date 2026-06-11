@@ -4,7 +4,7 @@ import type { WsMessage } from "../types";
 /**
  * WebSocket 连接/重连/心跳 Hook
  */
-export function useWebSocket(teacherId = "default", convId = "default") {
+export function useWebSocket(teacherId = "default", convId = "default", role = "teacher", studentId = "") {
   const [connected, setConnected] = useState(false);
   const [messages, setMessages] = useState<WsMessage[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
@@ -13,7 +13,7 @@ export function useWebSocket(teacherId = "default", convId = "default") {
   const connect = useCallback(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = import.meta.env.DEV ? "localhost:8000" : window.location.host;
-    const url = `${protocol}//${host}/ws?teacherId=${teacherId}&convId=${convId}`;
+    const url = `${protocol}//${host}/ws?teacherId=${teacherId}&convId=${convId}&role=${role}&studentId=${studentId}`;
 
     const ws = new WebSocket(url);
 

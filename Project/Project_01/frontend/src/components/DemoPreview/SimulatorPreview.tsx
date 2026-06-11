@@ -26,8 +26,17 @@ interface Props {
   onSimulatorUpdate?: (simulatorType: string, params: Record<string, unknown>) => void;
 }
 
+function inferSimulatorType(demo: Props["demo"]): string {
+  if (demo.simulator_type) return demo.simulator_type;
+  for (const step of demo.steps) {
+    const cfg = step.simConfig;
+    if (cfg && typeof cfg.type === "string") return cfg.type;
+  }
+  return "";
+}
+
 export default function SimulatorPreview({ demo, onSimulatorUpdate }: Props) {
-  const simType = demo.simulator_type || "";
+  const simType = inferSimulatorType(demo);
   const simConfig = demo.simulator_config || {};
 
   if (simType === "bplus_tree") {
@@ -47,10 +56,15 @@ export default function SimulatorPreview({ demo, onSimulatorUpdate }: Props) {
     <div className="flex h-full items-center justify-center bg-slate-50 p-8 text-center">
       <div className="max-w-xs">
         <GitBranch className="mx-auto h-12 w-12 text-slate-300" />
-        <h3 className="mt-4 text-base font-semibold">模拟器</h3>
+        <h3 className="mt-4 text-base font-semibold">暂无专业模拟器</h3>
         <p className="mt-2 text-sm text-slate-500">
-          输入"演示 B+树插入 42"或"模拟 RR 级别幻读"来启动模拟器
+          当前演示为 P0 六阶段讲解（流程/播放）。若要 B+树、事务或 SQL 分步动画，请发送例如：
         </p>
+        <ul className="mt-3 space-y-1.5 text-left text-xs text-slate-600">
+          <li>· 演示 B+树插入 42</li>
+          <li>· 模拟 RR 级别幻读</li>
+          <li>· 模拟执行 SELECT ... JOIN ...</li>
+        </ul>
       </div>
     </div>
   );

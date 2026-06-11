@@ -16,16 +16,32 @@ import ConversationPanel from "./components/ConversationPanel";
 import ChatPanel from "./components/ChatPanel";
 import DemoPreview from "./components/DemoPreview";
 import type { DemoComplete } from "./types";
+import {
+  normalizeDemoPayload,
+  normalizeDemoStep,
+  upsertDemoStep,
+} from "./utils/demoNormalize";
+
+type RightPreviewSize = 0 | 1 | 2;
+
+const RIGHT_PREVIEW_WIDTHS: Record<RightPreviewSize, number> = {
+  0: 380,
+  1: 560,
+  2: 720,
+};
 
 export default function App() {
   const [activeConv, setActiveConv] = useState<string | null>(null);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [rightPreviewSize, setRightPreviewSize] = useState<RightPreviewSize>(0);
   const { connected, messages: wsMessages, send } = useWebSocket(
     "default",
     activeConv || "default",
+    "teacher",
+    "",
   );
-  const { conversations, loading, create, remove, rename } = useConversations();
+  const { conversations, loading, total, search, create, remove, rename, copy } = useConversations();
   const [lastDemo, setLastDemo] = useState<DemoComplete | null>(null);
   const activeConversation = useMemo(
     () => conversations.find((c) => c.id === activeConv) || null,
@@ -62,15 +78,54 @@ export default function App() {
 
   useEffect(() => {
     if (latestDemoMsg && !hasNewerUpdated) {
-      setLastDemo(latestDemoMsg.payload as unknown as DemoComplete);
+      const normalized = normalizeDemoPayload(latestDemoMsg.payload);
+      if (normalized) setLastDemo(normalized);
     }
   }, [latestDemoMsg, hasNewerUpdated]);
 
-  // demo:updated → 替换 lastDemo（模拟器参数调整后更新，不持久化）
+  // step:preview → 右侧预览实时累积草稿，聊天区只保留简短状态卡
+  useEffect(() => {
+    const last = wsMessages.length > 0 ? wsMessages[wsMessages.length - 1] : null;
+    if (!last || last.event !== "step:preview") return;
+
+    const p = last.payload as Record<string, unknown>;
+    const rawIndex = typeof p.stepIndex === "number" ? p.stepIndex : 1;
+    const stepIndex = rawIndex > 0 ? rawIndex : 1;
+    const step = normalizeDemoStep(
+      {
+        index: stepIndex,
+        title: p.title,
+        content: p.content ?? "步骤内容正在生成中。",
+        stage: p.stage,
+        interactiveHint: p.interactiveHint,
+        mermaid: p.mermaid,
+        mermaidType: p.mermaidType,
+        simConfig: p.simConfig,
+      },
+      stepIndex,
+    );
+
+    const draftId = `draft_${activeConv || "default"}`;
+    setLastDemo((prev) => {
+      const base: DemoComplete =
+        prev?.demoId === draftId
+          ? prev
+          : { demoId: draftId, title: "正在生成演示", steps: [] };
+      return { ...base, steps: upsertDemoStep(base.steps, step) };
+    });
+  }, [wsMessages, activeConv]);
+
+  // demo:updated → 替换 lastDemo（模拟器参数调整后更新，保留 demoId 避免预览重置）
   useEffect(() => {
     const last = wsMessages.length > 0 ? wsMessages[wsMessages.length - 1] : null;
     if (!last || last.event !== "demo:updated") return;
-    setLastDemo(last.payload as unknown as DemoComplete);
+    const normalized = normalizeDemoPayload(last.payload);
+    if (normalized) {
+      setLastDemo((prev) => ({
+        ...normalized,
+        demoId: prev?.demoId ?? normalized.demoId,
+      }));
+    }
   }, [wsMessages]);
 
   // step:regenerated → 原地更新 lastDemo 中对应步骤的内容
@@ -78,18 +133,29 @@ export default function App() {
     const last = wsMessages.length > 0 ? wsMessages[wsMessages.length - 1] : null;
     if (!last || last.event !== "step:regenerated") return;
     const p = last.payload as Record<string, unknown>;
-    const stepIndex = p.stepIndex as number;
-    if (stepIndex === undefined) return;
+    const rawIndex = typeof p.stepIndex === "number" ? p.stepIndex : -1;
+    if (rawIndex < 0) return;
     setLastDemo((prev) => {
-      if (!prev || !prev.steps[stepIndex]) return prev;
+      if (!prev || rawIndex >= prev.steps.length || !prev.steps[rawIndex]) return prev;
+      const slot = rawIndex;
       const newSteps = [...prev.steps];
-      newSteps[stepIndex] = {
-        ...newSteps[stepIndex],
-        title: (p.title as string) || newSteps[stepIndex].title,
-        content: (p.content as string) || newSteps[stepIndex].content,
+      newSteps[slot] = {
+        ...newSteps[slot],
+        title: (p.title as string) || newSteps[slot].title,
+        content: (p.content as string) || newSteps[slot].content,
       };
       return { ...prev, steps: newSteps };
     });
+  }, [wsMessages]);
+
+  // error → console 告警
+  useEffect(() => {
+    const last = wsMessages.length > 0 ? wsMessages[wsMessages.length - 1] : null;
+    if (!last || last.event !== "error") return;
+    const p = last.payload as Record<string, unknown>;
+    const code = p.code as string;
+    const msg = p.message as string;
+    console.warn(`[WS Error] ${code}: ${msg}`);
   }, [wsMessages]);
 
   const handleSend = (text: string) => {
@@ -98,15 +164,26 @@ export default function App() {
   const handleQuizAnswer = (questionId: string, answer: string, question: Record<string, unknown>) => {
     send("quiz:answer", { questionId, answer, question, studentId: "local-student" });
   };
+  const handleSearch = async (q: string) => {
+    await search(q);
+  };
+  const handleCopy = async (id: string, title?: string) => {
+    const conv = await copy(id, title);
+    if (conv) setActiveConv(conv.id);
+  };
   const handleCreateConv = async (title?: string) => {
     const conv = await create(title);
     setActiveConv(conv.id);
   };
+  const cycleRightPreviewSize = () => {
+    setRightPreviewSize((size) => ((size + 1) % 3) as RightPreviewSize);
+  };
 
   const panelClass =
     "h-full min-h-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_10px_30px_-24px_rgba(15,23,42,0.35),0_1px_2px_rgba(15,23,42,0.04)]";
+  const rightColumnWidth = rightCollapsed ? 64 : RIGHT_PREVIEW_WIDTHS[rightPreviewSize];
   const desktopGridColumns = `${leftCollapsed ? 64 : 248}px minmax(0, 1fr) ${
-    rightCollapsed ? 64 : 340
+    rightColumnWidth
   }px`;
 
   return (
@@ -156,7 +233,7 @@ export default function App() {
         </header>
 
         <div
-          className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[var(--desktop-grid-columns)]"
+          className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-[var(--desktop-grid-columns)]"
           style={
             {
               "--desktop-grid-columns": desktopGridColumns,
@@ -183,6 +260,8 @@ export default function App() {
                   onRename={rename}
                   loading={loading}
                   onCollapse={() => setLeftCollapsed(true)}
+                  onSearch={handleSearch}
+                  onCopy={handleCopy}
                 />
               )}
             </div>
@@ -216,7 +295,20 @@ export default function App() {
                   onToggle={() => setRightCollapsed(false)}
                 />
               ) : (
-                <DemoPreview demo={lastDemo} onCollapse={() => setRightCollapsed(true)} onExport={() => send("demo:export", { format: "html" })} onRegenerate={(stepIndex, instructions) => send("step:regenerate", { stepIndex, instructions })} onSimulatorUpdate={(simulatorType, params) => send("simulator:update", { simulator_type: simulatorType, params })} />
+                <DemoPreview
+                  demo={lastDemo}
+                  panelSize={rightPreviewSize}
+                  isWide={rightPreviewSize > 0}
+                  onToggleWide={cycleRightPreviewSize}
+                  onCollapse={() => setRightCollapsed(true)}
+                  onExport={(fmt) => send("demo:export", { format: fmt || "html" })}
+                  onRegenerate={(stepIndex, instructions) =>
+                    send("step:regenerate", { stepIndex, instructions })
+                  }
+                  onSimulatorUpdate={(simulatorType, params) =>
+                    send("simulator:update", { simulator_type: simulatorType, params })
+                  }
+                />
               )}
             </div>
           </div>

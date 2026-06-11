@@ -32,16 +32,45 @@ class ConversationUpdate(BaseModel):
 
 # ─── API 端点 ────────────────────────────────────────────────
 @router.get("")
-async def list_conversations(db: AsyncSession = Depends(get_db)):
-    """获取对话列表（按更新时间倒序），过滤学生私有对话"""
-    result = await db.execute(
+async def list_conversations(
+    q: str = "",
+    page: int = 1,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取对话列表（按更新时间倒序），支持关键词搜索和分页，过滤学生私有对话"""
+    # 限制最大长度防滥用
+    q = q[:200]
+
+    query = (
         select(Conversation)
         .where(~Conversation.id.like("%:student:%"))
-        .order_by(Conversation.updated_at.desc())
     )
+    if q:
+        # 转义 LIKE 通配符，避免用户搜索 "100%" 意外匹配过多结果
+        safe_q = q.replace("%", "\\%").replace("_", "\\_")
+        like = f"%{safe_q}%"
+        query = query.where(
+            Conversation.title.ilike(like, escape="\\") |
+            Conversation.summary.ilike(like, escape="\\") |
+            Conversation.id.ilike(like, escape="\\")
+        )
+    # 查询总数
+    from sqlalchemy import func
+    count_q = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_q)).scalar() or 0
+
+    query = query.order_by(Conversation.updated_at.desc())
+    query = query.offset((page - 1) * limit).limit(limit)
+    result = await db.execute(query)
     conversations = result.scalars().all()
-    logger.info("获取对话列表", extra={"data": {"count": len(conversations)}})
-    return {"conversations": [conv_to_dict(c) for c in conversations]}
+    logger.info("获取对话列表", extra={"data": {"count": len(conversations), "total": total, "q": q}})
+    return {
+        "conversations": [conv_to_dict(c) for c in conversations],
+        "total": total,
+        "page": page,
+        "limit": limit,
+    }
 
 
 @router.post("")
@@ -55,6 +84,61 @@ async def create_conversation(data: ConversationCreate, db: AsyncSession = Depen
     await db.flush()
     logger.info("创建对话", extra={"data": {"id": conv.id, "title": conv.title}})
     return conv_to_dict(conv)
+
+
+@router.get("/{conv_id}/snapshots")
+async def get_snapshots(conv_id: str, limit: int = 20, db: AsyncSession = Depends(get_db)):
+    """获取对话的演示版本快照列表"""
+    from app.models.conversation import Demo
+    result = await db.execute(
+        select(Demo)
+        .where(Demo.conv_id == conv_id)
+        .order_by(Demo.version.desc())
+        .limit(limit)
+    )
+    snapshots = result.scalars().all()
+    return {"snapshots": [
+        {
+            "id": s.id,
+            "version": s.version,
+            "snapshot_order": s.snapshot_order,
+            "title": s.title,
+            "demo_type": s.demo_type,
+            "created_at": s.created_at.isoformat() if s.created_at else "",
+        }
+        for s in snapshots
+    ]}
+
+
+@router.get("/{conv_id}/messages")
+async def get_messages(
+    conv_id: str,
+    page: int = 1,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取消息历史（分页）"""
+    result = await db.execute(
+        select(Message)
+        .where(Message.conv_id == conv_id)
+        .order_by(Message.created_at.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+    )
+    messages = result.scalars().all()
+    # 按时间正序返回
+    messages = list(reversed(messages))
+    return {"messages": [
+        {
+            "id": m.id,
+            "role": m.role,
+            "type": m.type,
+            "content": m.content,
+            "metadata": m.metadata_,
+            "created_at": m.created_at.isoformat() if m.created_at else "",
+        }
+        for m in messages
+    ]}
 
 
 @router.get("/{conv_id}")

@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import {
   Archive,
   ChevronRight,
+  Copy,
   MessageSquare,
   PanelLeftClose,
   Plus,
@@ -20,6 +21,8 @@ interface Props {
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onCollapse?: () => void;
+  onSearch?: (q: string) => void;
+  onCopy?: (id: string, title?: string) => void;
 }
 
 const CATEGORIES: { key: Conversation["status"] | "all"; label: string }[] = [
@@ -58,6 +61,8 @@ export default function ConversationPanel({
   onDelete,
   onRename,
   onCollapse,
+  onSearch,
+  onCopy,
 }: Props) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Conversation["status"] | "all">("all");
@@ -131,7 +136,10 @@ export default function ConversationPanel({
             type="text"
             placeholder="搜索演示项目…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              onSearch?.(e.target.value);
+            }}
             className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-200/70
                        rounded-xl placeholder:text-slate-400 text-slate-700
                        transition-all duration-200
@@ -264,6 +272,7 @@ function ConversationCard({
   onChangeEditTitle,
   onConfirmRename,
   onDelete,
+  onCopy,
 }: {
   conversation: Conversation;
   active: boolean;
@@ -274,6 +283,7 @@ function ConversationCard({
   onChangeEditTitle: (v: string) => void;
   onConfirmRename: () => void;
   onDelete: () => void;
+  onCopy?: (id: string, title?: string) => void;
 }) {
   const badge = STATUS_BADGE[c.status] || STATUS_BADGE.active;
 
@@ -346,15 +356,26 @@ function ConversationCard({
             {badge.label}
           </span>
 
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="flex items-center justify-center w-7 h-7 rounded-lg
-                       text-slate-300 opacity-0 group-hover:opacity-100
-                       hover:text-red-500 hover:bg-red-50
-                       transition-all duration-150"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-150">
+            {onCopy && c.snapshot_count > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onCopy(c.id, `${c.title} (改编)`); }}
+                className="flex items-center justify-center w-7 h-7 rounded-lg
+                           text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                title="基于此演示改编"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="flex items-center justify-center w-7 h-7 rounded-lg
+                         text-slate-300 hover:text-red-500 hover:bg-red-50
+                         transition-all duration-150"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

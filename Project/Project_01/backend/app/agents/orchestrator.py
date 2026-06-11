@@ -80,6 +80,9 @@ class OrchestratorAgent:
                 import uuid
                 msg_id = f"msg_{uuid.uuid4().hex[:12]}"
 
+            # 2. 加载教师 Profile（风格偏好）
+            teacher_profile = await self._load_teacher_profile(conv_id)
+
             # 3. 推送 agent:thinking — 正在分析
             await ws_manager.send_personal(websocket, "agent:thinking", {
                 "step": "analyze",
@@ -88,7 +91,7 @@ class OrchestratorAgent:
 
             # 4. 尝试 SQL 分析（如果输入看起来像 SQL）
             sql_analysis = None
-            if self._looks_like_sql(content):
+            if self._contains_sql(content):
                 sql_analysis = analyze_sql(content)
                 logger.info("SQL 分析完成", extra={"data": {"convId": conv_id, "tables": len(sql_analysis.get("tables", []))}})
 
@@ -112,7 +115,7 @@ class OrchestratorAgent:
                             scenario=sim_intent.get("scenario", "phantom_read"),
                         )
                     elif sim_intent["type"] == "sql_execution":
-                        sql = content if self._looks_like_sql(content) else "SELECT * FROM t1 JOIN t2 ON ..."
+                        sql = content if self._contains_sql(content) else "SELECT * FROM t1 JOIN t2 ON ..."
                         result = simulate_sql_execution(
                             sql=sql,
                             join_type=sim_intent.get("join_type", "Nested Loop Join"),
@@ -120,7 +123,7 @@ class OrchestratorAgent:
                         )
                     elif sim_intent["type"] == "strategy_compare":
                         result = simulate_sql_strategy_compare(
-                            sql=content if self._looks_like_sql(content) else "",
+                            sql=content if self._contains_sql(content) else "",
                             tables=[{"name": "students", "rows": 100}, {"name": "scores", "rows": 500}],
                         )
                     else:
@@ -137,9 +140,9 @@ class OrchestratorAgent:
                     logger.error(f"模拟器生成失败: {e}", extra={"data": {"convId": conv_id}})
                     # 降级到 LLM 生成
 
-            # 5b. 调用 LLM Gateway 生成演示（传入分析结果作为上下文）
+            # 5b. 调用 LLM Gateway 生成演示（传入 Profile + 分析结果作为上下文）
             try:
-                result = await llm_gateway.generate_demo(content, conv_id, sql_analysis=sql_analysis)
+                result = await llm_gateway.generate_demo(content, conv_id, teacher_profile=teacher_profile, sql_analysis=sql_analysis)
                 steps = result.get("steps", [])
             except asyncio.CancelledError:
                 raise  # 由 manager.py 的 task.cancel() 发起，向上传播
@@ -177,7 +180,7 @@ class OrchestratorAgent:
 
                 stage = step.get("stage", "")
                 stage_label = self._stage_label(stage)
-                await ws_manager.send_personal(websocket, "step:preview", {
+                preview_payload: dict = {
                     "stepIndex": step.get("index", 0),
                     "title": step.get("title", ""),
                     "content": step.get("content", ""),
@@ -186,7 +189,11 @@ class OrchestratorAgent:
                     "interactiveHint": step.get("interactive_hint", ""),
                     "mermaid": step.get("mermaid", ""),
                     "mermaidType": step.get("mermaid_type", ""),
-                })
+                }
+                sim_cfg = step.get("simConfig") or step.get("sim_config")
+                if isinstance(sim_cfg, dict) and sim_cfg:
+                    preview_payload["simConfig"] = sim_cfg
+                await ws_manager.send_personal(websocket, "step:preview", preview_payload)
 
             # 7. 保存 AI 回复消息 + demo_snapshot 到 PG
             title = result.get("title", f"演示: {content[:30]}")
@@ -214,11 +221,13 @@ class OrchestratorAgent:
                 await self._notify_interrupted(ws_manager, websocket)
                 return
 
-            await ws_manager.send_personal(websocket, "demo:complete", {
+            complete_payload: dict = {
                 "demoId": demo_id,
                 "title": title,
                 "steps": steps,
-            })
+            }
+            complete_payload.update(self._extract_simulator_metadata(result, steps))
+            await ws_manager.send_personal(websocket, "demo:complete", complete_payload)
 
         except asyncio.CancelledError:
             # task.cancel() — manager.py 发出的打断请求
@@ -291,6 +300,7 @@ class OrchestratorAgent:
                 "steps": steps,
                 "simulator_type": sim_type,
                 "simulator_config": {k: result[k] for k in ("operation", "key", "order", "isolation_level", "scenario", "join_type") if k in result},
+                "demo_type": "simulator",
             })
 
         except Exception as e:
@@ -376,6 +386,13 @@ class OrchestratorAgent:
             "interactiveHint": original_step.get("interactive_hint", ""),
         })
 
+        # 6. 从编辑操作推断教师风格并异步更新 Profile
+        asyncio.create_task(self._update_style_from_edit(
+            conv_id, instructions,
+            original_step.get("content", ""),
+            steps[step_index].get("content", ""),
+        ))
+
     async def export_demo(self, websocket, ws_manager, conv_id: str, payload: dict):
         """导出当前演示（demo:export）"""
         fmt = payload.get("format", "html")
@@ -451,6 +468,41 @@ h1 {{ font-size:1.8rem; margin-bottom:8px; }}
                 "content": html_content,
                 "filename": f"{html.escape(title[:20])}.html",
             })
+        elif fmt == "mermaid":
+            # 提取所有步骤的 Mermaid 代码
+            mermaid_blocks = []
+            for s in steps:
+                mermaid_code = s.get("mermaid", "")
+                if mermaid_code:
+                    stage = s.get("stage", "")
+                    stage_label = self._stage_label(stage)
+                    mermaid_blocks.append(f"## {stage_label} - {s.get('title', '')}\n\n```mermaid\n{mermaid_code}\n```")
+            mermaid_content = "\n\n".join(mermaid_blocks) if mermaid_blocks else "# 未找到 Mermaid 代码"
+            await ws_manager.send_personal(websocket, "demo:exported", {
+                "format": "mermaid",
+                "content": mermaid_content,
+                "filename": f"{html.escape(title[:20])}.md",
+            })
+        elif fmt == "standalone":
+            # 生成自包含 HTML（可用于手动嵌入 LMS，非标准 LTI 1.3 包）
+            lti_html = f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>{html.escape(title)}</title>
+<base target="_blank" />
+<style>body{{font-family:system-ui,sans-serif;padding:20px;background:#f8fafc;}}</style>
+</head>
+<body>
+<h1>{html.escape(title)}</h1>
+<p>由 DB Demo Studio 生成，可用于 LMS 嵌入（Canvas/Moodle）。</p>
+<div class="steps">
+{"".join(f'<details><summary>步骤 {s.get("index","?")}: {html.escape(s.get("title",""))}</summary><p>{html.escape(s.get("content",""))}</p></details>' for s in steps)}
+</div>
+</body></html>"""
+            await ws_manager.send_personal(websocket, "demo:exported", {
+                "format": "standalone",
+                "content": lti_html,
+                "filename": f"{html.escape(title[:20])}_lti.html",
+            })
         else:
             await ws_manager.send_personal(websocket, "error", {
                 "code": "UNSUPPORTED_FORMAT",
@@ -459,9 +511,17 @@ h1 {{ font-size:1.8rem; margin-bottom:8px; }}
 
     @staticmethod
     def _looks_like_sql(text: str) -> bool:
-        """检测输入是否像是 SQL 语句"""
+        """检测输入是否以 SQL 关键字开头。"""
         upper = text.strip().upper()
         return any(upper.startswith(kw) for kw in ("SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER", "WITH", "EXPLAIN", "SHOW"))
+
+    @staticmethod
+    def _contains_sql(text: str) -> bool:
+        """检测文本中是否包含 SQL 语句片段（不限于行首）。"""
+        if OrchestratorAgent._looks_like_sql(text):
+            return True
+        upper = text.upper()
+        return any(kw in upper for kw in ("SELECT ", "INSERT ", "UPDATE ", "DELETE ", "JOIN ", "EXPLAIN "))
 
     async def _send_simulator_result(self, websocket, ws_manager, conv_id, msg_id, result, steps, content):
         """推送模拟器结果（跳过 LLM 调用）"""
@@ -496,9 +556,35 @@ h1 {{ font-size:1.8rem; margin-bottom:8px; }}
         })
 
     @staticmethod
+    def _extract_simulator_metadata(result: dict, steps: list) -> dict:
+        """从 LLM/模拟器结果中提取前端 SimulatorPreview 所需元数据。"""
+        meta: dict = {}
+        sim_type = result.get("simulator_type") or result.get("simulatorType")
+        if not sim_type:
+            for step in steps:
+                cfg = step.get("simConfig") or step.get("sim_config")
+                if isinstance(cfg, dict) and cfg.get("type"):
+                    sim_type = cfg["type"]
+                    break
+        if sim_type:
+            meta["simulator_type"] = sim_type
+        sim_config = result.get("simulator_config") or result.get("simulatorConfig")
+        if isinstance(sim_config, dict) and sim_config:
+            meta["simulator_config"] = sim_config
+        demo_type = result.get("demo_type") or result.get("demoType") or result.get("type")
+        if demo_type:
+            meta["demo_type"] = demo_type
+        elif sim_type:
+            meta["demo_type"] = "simulator"
+        return meta
+
+    @staticmethod
     def _detect_simulator_intent(content: str) -> dict | None:
         """检测用户是否要求启动模拟器"""
         lower = content.lower()
+        if "模拟" in lower and OrchestratorAgent._contains_sql(content):
+            join_type = "Hash Join" if "hash" in lower else "Sort Merge Join" if "sort" in lower or "merge" in lower else "Nested Loop Join"
+            return {"type": "sql_execution", "label": "SQL 执行模拟器", "join_type": join_type}
         if any(kw in lower for kw in ("策略对比", "join对比", "对比join", "对比策略", "nested loop vs", "hash join vs", "sort merge vs", "哪种join", "哪种连接")):
             return {"type": "strategy_compare", "label": "JOIN 策略对比"}
         # 也匹配 "对比 JOIN 策略" 等组合（关键词不连续的情况）
@@ -635,6 +721,96 @@ h1 {{ font-size:1.8rem; margin-bottom:8px; }}
         return "knowledge_point"
 
     # ─── 测验系统 ──────────────────────────────────────────
+
+    async def _load_teacher_profile(self, conv_id: str) -> Optional[dict]:
+        """加载教师 Profile（Redis 缓存 → PG）"""
+        try:
+            # 从 teacherId 推断
+            teacher_id = conv_id.split(":")[0] if ":" in conv_id else "default"
+            client = await redis_cache.get_client()
+            if client:
+                cached = await client.get(f"teacher:profile:{teacher_id}")
+                if cached:
+                    logger.info(f"教师 Profile 缓存命中: teacher={teacher_id}")
+                    return json.loads(cached)
+            # 从 PG 读
+            from app.models.teacher import TeacherProfile
+            async with async_session_factory() as db:
+                result = await db.execute(
+                    select(TeacherProfile).where(TeacherProfile.teacher_id == teacher_id)
+                )
+                profile = result.scalar_one_or_none()
+                if profile:
+                    data = {
+                        "style": profile.style or {},
+                        "preferences": profile.preferences or {},
+                    }
+                    logger.info(f"教师 Profile 已加载: teacher={teacher_id}")
+                    return data
+                logger.info(f"教师 Profile 不存在，使用默认: teacher={teacher_id}")
+        except Exception as e:
+            logger.warning(f"教师 Profile 加载失败: {e}")
+        return None
+
+    @staticmethod
+    async def _infer_style_from_edit(instructions: str, original_content: str, rewritten_content: str) -> dict:
+        """从编辑操作推断教师风格偏好"""
+        insights = {}
+        orig_len = len(original_content)
+        new_len = len(rewritten_content)
+
+        # 篇幅偏好
+        ratio = new_len / orig_len if orig_len > 0 else 1.0
+        if ratio < 0.7:
+            insights["detail_level"] = "concise"
+        elif ratio > 1.3:
+            insights["detail_level"] = "detailed"
+        else:
+            insights["detail_level"] = "balanced"
+
+        # 风格线索
+        instruction_lower = instructions.lower()
+        if any(kw in instruction_lower for kw in ("通俗", "简单", "浅显", "易懂")):
+            insights["formality"] = "casual"
+        elif any(kw in instruction_lower for kw in ("深入", "专业", "正式", "技术")):
+            insights["formality"] = "formal"
+        if any(kw in instruction_lower for kw in ("举例", "例子", "类比", "比喻")):
+            insights["examples"] = "many"
+
+        return insights
+
+    async def _update_style_from_edit(self, conv_id: str, instructions: str, original_content: str, rewritten_content: str):
+        """从编辑操作推断风格偏好并持久化到 PG"""
+        try:
+            insights = await self._infer_style_from_edit(instructions, original_content, rewritten_content)
+            if not insights:
+                return
+
+            teacher_id = conv_id.split(":")[0] if ":" in conv_id else "default"
+
+            # 更新 PG
+            from app.models.teacher import TeacherProfile
+            async with async_session_factory() as db:
+                result = await db.execute(
+                    select(TeacherProfile).where(TeacherProfile.teacher_id == teacher_id)
+                )
+                profile = result.scalar_one_or_none()
+                if not profile:
+                    profile = TeacherProfile(teacher_id=teacher_id)
+                    db.add(profile)
+                current_style = dict(profile.style or {})
+                current_style.update(insights)
+                profile.style = current_style
+                await db.commit()
+
+            # 刷新 Redis 缓存
+            client = await redis_cache.get_client()
+            if client:
+                await client.delete(f"teacher:profile:{teacher_id}")
+
+            logger.info(f"教师风格已自动更新: teacher={teacher_id}, insights={insights}")
+        except Exception as e:
+            logger.warning(f"教师风格自动更新失败: {e}")
 
     @staticmethod
     def _normalize_quiz_questions(questions: list, expected_count: int, q_type: str, topic: str) -> list:

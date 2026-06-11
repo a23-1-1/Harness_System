@@ -17,7 +17,7 @@ pnpm install
 pnpm dev                    # localhost:5173
 
 # Docker 数据库
-docker compose -f docker/docker-compose.yml up -d
+docker compose up -d
 
 # 完整验证
 bash init.sh
