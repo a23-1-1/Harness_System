@@ -2,7 +2,8 @@
 
 > 参照：learn-harness-engineering/project-06（Capstone）最大 Harness 模式  
 > 适配：AI 协作式数据库课程演示工作台（React + FastAPI + WebSocket + Redis + PostgreSQL）  
-> 生成日期：2026-06-05
+> 生成日期：2026-06-05  
+> 最后更新：2026-06-12（Harness 文件体系已落地，feat-001~010 全部完成）
 
 ---
 
@@ -42,25 +43,29 @@
 | **scripts/cleanup-scanner.sh** | 孤立文件检测 | 清理扫描——**自动检测** |
 | **scripts/check-architecture.sh** | 层边界守卫 | 架构验证——**自动执行规则** |
 
-### 1.2 当前 DB Demo Studio 的 Harness 状态
+### 1.2 当前 DB Demo Studio 的 Harness 状态（更新于 2026-06-12）
 
-| 文件 | 状态 | 差距 |
+| 文件 | 状态 | 备注 |
 |------|------|------|
-| CLAUDE.md | ✅ 已完成 | 少了一个"代理导向"AGENTS.md——需拆分 |
-| feature_list.json | ✅ 10 个功能 | 缺 evidence + testedAt 字段，所有 status 为 "not-started" |
-| init.sh | ⚠️ 基础版本 | 缺少 Harness 文件完整性检查、样本数据验证 |
-| progress.md | ✅ 已完成 | 需按 project-06 模式重写（每个会话独立区块 + 决策记录） |
-| session-handoff.md | ⚠️ 模板版本 | 需填充为真实交接（已完成/剩余/修改的文件/失败尝试） |
-| docs/requirements-spec.md | ✅ 已完成 | 需拆分到 ARCHITECTURE.md + PRODUCT.md + RELIABILITY.md 三份 |
-| clean-state-checklist.md | ❌ 缺失 | 必须创建 |
-| evaluator-rubric.md | ❌ 缺失 | 必须创建 |
-| quality-document.md | ❌ 缺失 | 必须创建 |
-| docs/ARCHITECTURE.md | ❌ 缺失 | 必须创建 |
-| docs/PRODUCT.md | ❌ 缺失 | 必须创建 |
-| docs/RELIABILITY.md | ❌ 缺失 | 必须创建 |
-| scripts/benchmark.sh | ❌ 缺失 | 必须创建 |
-| scripts/cleanup-scanner.sh | ❌ 缺失 | 必须创建 |
-| scripts/check-architecture.sh | ❌ 缺失 | 建议创建（完成架构后） |
+| AGENTS.md | ✅ 已完成 | 7 步启动流程、层边界、Done 定义、会话交接 |
+| CLAUDE.md | ✅ 已完成 | 构建命令、关键文件表、WebSocket/REST API 参考 |
+| feature_list.json | ✅ 已完成 | 10 个功能全部 `done`，均有 `evidence` |
+| init.sh | ✅ 已完成 | 6 步验证：Harness 文件检查 + 后端/前端/Docker |
+| progress.md | ✅ 已完成 | 记录至 feat-010 完成（Session 010，2026-06-10） |
+| session-handoff.md | ✅ 已更新 | Plan A 单分支策略已记录；维护阶段交接 |
+| docs/requirements-spec.md | ✅ 已完成 | v5 完整规格（源文档） |
+| docs/ARCHITECTURE.md | ✅ 已完成 | 已从 requirements-spec 拆分 |
+| docs/PRODUCT.md | ✅ 已完成 | 已从 requirements-spec 拆分 |
+| docs/RELIABILITY.md | ✅ 已完成 | 日志、清理状态、基准策略 |
+| clean-state-checklist.md | ✅ 已完成 | 7 类 30+ 项检查 |
+| evaluator-rubric.md | ✅ 已同步 | 功能评分已更新至 feat-010 |
+| quality-document.md | ✅ 已同步 | 10/10 功能已实现 |
+| scripts/benchmark.sh | ✅ 已完成 | 性能基准任务套件 |
+| scripts/cleanup-scanner.sh | ✅ 已完成 | 孤立文件检测 |
+| scripts/check-architecture.sh | ✅ 已完成 | 层边界守卫 |
+| .cursor/agents/harness-auditor.md | ✅ 新增 | 项目级 Harness 审计子代理（可选入库） |
+
+**功能完成度**：feat-001 ~ feat-010 全部 `done`，证据见 `feature_list.json`。
 
 ---
 
@@ -449,13 +454,15 @@ Phase 6: 智能增强 + 生产部署（第 9-11 周）
 ### 6.1 整体时间线（11 周）
 
 ```
-Week 1-2:  ████████  feat-001 项目脚手架 & 对话基础设施
-Week 2-3:  ████████  feat-002 AI Agent Runtime & LLM Gateway
-Week 3-5:  ████████████████  feat-003 P0 即时演示 || feat-007 课堂广播
-Week 5-7:  ████████████████  feat-004 P1 可视化 || feat-005 P2 模拟器
-Week 7-9:  ████████████████  feat-006 测验闭环 || feat-008 搜索快照导出
-Week 9-11: ████████████████  feat-009 课纲 RAG || feat-010 性能优化
+Week 1-2:  ████████  feat-001 项目脚手架 & 对话基础设施          ✅ 完成
+Week 2-3:  ████████  feat-002 AI Agent Runtime & LLM Gateway    ✅ 完成
+Week 3-5:  ████████████████  feat-003 P0 即时演示 || feat-007   ✅ 完成
+Week 5-7:  ████████████████  feat-004 P1 可视化 || feat-005     ✅ 完成
+Week 7-9:  ████████████████  feat-006 测验闭环 || feat-008       ✅ 完成
+Week 9-11: ████████████████  feat-009 课纲 RAG || feat-010       ✅ 完成
 ```
+
+**当前阶段**（2026-06-12）：维护 / 验证 / 生产部署优化。新功能在 `Project/Project_01/` 目录下于 `master` 分支开发。
 
 ### 6.2 每周执行模板（基于 PIV 循环）
 
@@ -554,31 +561,32 @@ Layer 5: 产品闸门（每周五，<5min）
 
 ## 八、分支策略与协作方案
 
-### 8.1 分支角色定义
+### 8.1 当前分支策略（Plan A，2026-06-12）
 
-| 分支 | 角色 | Harness 配置 | 什么在上面开发 |
-|------|------|------------|--------------|
-| `p01-baseline` | **标准实现** | 完整最大 Harness | 按 requirements-spec.md 逐步实现所有功能 |
-| `p01-improved` | **改进实验** | 复制 baseline Harness → 调整 CLAUDE.md（更激进规则） | 实验性优化（不同架构方案、不同 LLM 策略） |
-| `project-01` | **汇合点** | 最简 Harness | 当 baseline 和 improved 都做完后，merge 选择的方案 |
+本仓库采用 **单 `master` 主分支**，模块通过目录区分，不使用多分支体系（与 `README.md`、`AGENTS.md` 一致）。
 
-<!-- ### 8.2 开发流程
+| 项 | 状态 |
+|----|------|
+| 本地分支 | 仅 `master` |
+| 远程主分支 | `origin/master`（已与本地同步） |
+| 工作目录 | `Project/Project_01/`（DB Demo Studio） |
+| 已废弃本地分支 | `feat-003-p0-demo`、`p01-baseline`、`p01-improved`、`project-01`、`project-02`（Plan A 清理已删除） |
+| 待清理远程分支 | `origin/feat-003-p0-demo`（内容已合并进 `master`，可安全删除） |
 
-```
-1. 始终在 p01-baseline 上开发标准版本
-   ├─ 每个功能：feature 分支 → PR → merge 到 p01-baseline
-   └─ 用法：git checkout -b feat-001 p01-baseline
+**开发约定**：所有新工作在 `master` 上、于 `Project/Project_01/` 目录内完成；实验性对比用目录（如 `Project_01_experiment/`）而非新分支。
 
-2. 当一个功能在 baseline 完成并验证后：
-   ├─ 切换到 p01-improved
-   ├─ cherry-pick baseline 的工作
-   ├─ 调整实现（不同的架构/技术方案）
-   └─ 对比两个分支的效果
+<!-- ### 8.2 历史方案（已废弃，2026-06-05 草案）
 
-3. 最终：
-   ├─ 选择表现更好的方案
-   └─ merge 到 project-01（或其他主分支）
-``` -->
+曾规划多分支对比实验：
+
+| 分支 | 角色 |
+|------|------|
+| `p01-baseline` | 标准实现 |
+| `p01-improved` | 改进实验 |
+| `project-01` | 汇合点 |
+
+已于 2026-06-12 执行 Plan A：fast-forward 合并 `feat-003-p0-demo` → `master`，删除过时本地分支。
+-->
 
 ---
 
@@ -596,11 +604,13 @@ Layer 5: 产品闸门（每周五，<5min）
 ### ADR-002：为什么 feature_list.json 用 "pass/fail" 而非 "done/not-started"？
 
 **日期**：2026-06-05  
-**决策**：采用 project-06 的 `status: "pass/fail"` + ` evidence + testedAt` 模式  
+**决策**：采用 project-06 的 `status: "pass/fail"` + `evidence` + `testedAt` 模式  
 **原因**：
 1. "done" 太主观——Agent 可能声称完成但实际没通过验证
 2. "pass" 意味着"测试通过、有证据、有时戳"——验证驱动
 3. `evidence` 字段是可追溯的真值——任何人都能检查证据是否成立
+
+**实际落地**（2026-06-12）：采用 `status: "done"` + `evidence`；`testedAt` 未强制，完成证据写在 `evidence` 字段。10 个功能均已标记 `done` 并附证据。
 
 ### ADR-003：为什么在 P0 文本演示之前先做 Docker + Redis？
 
@@ -613,5 +623,5 @@ Layer 5: 产品闸门（每周五，<5min）
 
 ---
 
-> **文档维护规则**：每完成一个功能后，更新对应的 docs/（ARCHITECTURE/PRODUCT/RELIABILITY），更新 feature_list.json（status + evidence + testedAt），更新 evaluator-rubric.md，更新 quality-document.md。  
-> **下一份要读的文件**：`AGENTS.md`（Agent 启动入口）→ `CLAUDE.md`（快速参考）→ `feature_list.json`（选一个功能开始）
+> **文档维护规则**：每完成一个功能后，更新对应的 docs/（ARCHITECTURE/PRODUCT/RELIABILITY），更新 feature_list.json（status + evidence），更新 evaluator-rubric.md，更新 quality-document.md。  
+> **下一份要读的文件**：`AGENTS.md`（Agent 启动入口）→ `CLAUDE.md`（快速参考）→ `progress.md`（当前状态）→ `clean-state-checklist.md`（验证闸门）

@@ -14,11 +14,15 @@
 
 ### 启动
 
-```bash
-# 1. 启动数据库
-docker compose up -d
+> **注意**：只有一个应用后端（`backend/app/main.py`）。请 **不要** 同时运行本地 `uvicorn :8000` 和 `docker compose` 里的 `backend` 服务，否则会端口冲突或连到旧镜像。
 
-# 2. 启动后端
+**方式 A — 本地开发（推荐）**
+
+```bash
+# 1. 仅启动数据库（postgres + redis）
+docker compose up -d postgres redis
+
+# 2. 启动后端（本地代码，热重载）
 cd backend
 python -m venv venv && source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
@@ -28,6 +32,13 @@ uvicorn app.main:app --reload --port 8000
 cd frontend
 pnpm install
 pnpm dev          # http://localhost:5173
+```
+
+**方式 B — 全 Docker 部署**
+
+```bash
+docker compose up -d --build
+# 前端 http://localhost:3000；勿再执行方式 A 的本地 uvicorn
 ```
 
 ### 配置

@@ -23,6 +23,8 @@ docker compose up -d
 bash init.sh
 ```
 
+**启动须知**：全仓库仅一个业务后端 `backend/app/main.py`。本地开发与 Docker 不要同时占用 `:8000`——否则前端会连到旧容器而非你刚改的代码。本地开发推荐：`docker compose up -d postgres redis` + 本地 `uvicorn`；全栈 Docker 用 `docker compose up --build`，勿再起本地 uvicorn。
+
 ## 关键文件
 
 | 文件 | 用途 |
