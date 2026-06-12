@@ -28,6 +28,7 @@
 
 - Streamlit 作为前端框架，所有功能通过对话触发
 - Claude API (anthropic SDK) 作为 AI 后端
+- Git Plan A (2026-06-12): single branch `master` only; fast-forward merged `feat-003-p0-demo`, deleted local `p01-baseline` / `p01-improved` / `project-01` / `project-02` / `feat-003-p0-demo`. Push `master` when network allows; consider deleting `origin/feat-003-p0-demo` after verify.
 
 ## Next Session Startup
 
