@@ -28,6 +28,77 @@ function isSequenceDiagram(code: string): boolean {
   return /^\s*sequenceDiagram/m.test(code);
 }
 
+function isFlowchart(code: string): boolean {
+  return /^\s*(flowchart|graph)\s/m.test(code);
+}
+
+/** 方括号/圆括号节点内的标签若含 : > ( ) 等，必须用引号包裹。 */
+function quoteNodeLabel(label: string): string {
+  const inner = label.trim();
+  if (!inner) return '""';
+  if (/^".*"$/.test(inner)) return inner;
+  if (/[:<>()[\]{}|]/.test(inner) || /\s/.test(inner)) {
+    return `"${inner.replace(/"/g, "'")}"`;
+  }
+  return inner;
+}
+
+function sanitizeBracketNodes(line: string): string {
+  return line
+    .replace(/(\b[\w-]+)\[([^\]"\n]+)\]/g, (_, id: string, label: string) => {
+      return `${id}[${quoteNodeLabel(label)}]`;
+    })
+    .replace(/(\b[\w-]+)\(([^)"\n]+)\)/g, (_, id: string, label: string) => {
+      return `${id}(${quoteNodeLabel(label)})`;
+    })
+    .replace(/\[\[([^\]"\n]+)\]\]/g, (_, label: string) => {
+      return `[["${label.trim().replace(/"/g, "'")}"]]`;
+    });
+}
+
+function sanitizeFlowchartLine(line: string): string {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith("%%")) return trimmed;
+  if (/^(subgraph|end|classDef|class|style|linkStyle|click)\b/i.test(trimmed)) {
+    return sanitizeBracketNodes(trimmed);
+  }
+  if (/(-->|---|-\.->|==>|---o|--o|x--|o--)/.test(trimmed)) {
+    return sanitizeBracketNodes(trimmed);
+  }
+  // 裸文本行如 "Table Scan: students" → 转为可渲染节点
+  if (/^[\w\s.:><=+-]+$/.test(trimmed) && /:/.test(trimmed)) {
+    const safe = trimmed.replace(/"/g, "'");
+    const id = `N${Math.abs(safe.split("").reduce((a, c) => a + c.charCodeAt(0), 0)) % 10000}`;
+    return `${id}["${safe}"]`;
+  }
+  return sanitizeBracketNodes(trimmed);
+}
+
+function linkOrphanFlowchartNodes(lines: string[]): string[] {
+  const result: string[] = [];
+  const orphanIds: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const nodeOnly = trimmed.match(/^([\w-]+)\[/);
+    if (nodeOnly && !/-->|---/.test(trimmed)) {
+      orphanIds.push(nodeOnly[1]);
+      result.push(trimmed);
+      continue;
+    }
+    result.push(trimmed);
+  }
+  if (orphanIds.length >= 2) {
+    for (let i = 0; i < orphanIds.length - 1; i += 1) {
+      const edge = `${orphanIds[i]} --> ${orphanIds[i + 1]}`;
+      if (!result.some((l) => l.includes(edge))) {
+        result.push(edge);
+      }
+    }
+  }
+  return result;
+}
+
 function sanitizeParticipantName(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "Node";
@@ -92,7 +163,14 @@ export function sanitizeMermaidCode(raw: string): string {
     return ["sequenceDiagram", ...sanitized].join("\n");
   }
 
-  return [header, ...bodyLines.map((l) => l.trim()).filter(Boolean)].join("\n");
+  if (isFlowchart(raw) || /^flowchart|^graph/i.test(header)) {
+    const sanitized = linkOrphanFlowchartNodes(
+      bodyLines.map(sanitizeFlowchartLine).filter(Boolean),
+    );
+    return [header, ...sanitized].join("\n");
+  }
+
+  return [header, ...bodyLines.map((l) => sanitizeBracketNodes(l.trim())).filter(Boolean)].join("\n");
 }
 
 export function mermaidFallbackFlowchart(title: string): string {

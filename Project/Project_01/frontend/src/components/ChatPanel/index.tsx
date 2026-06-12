@@ -153,8 +153,8 @@ export default function ChatPanel({
   const insertSqlTemplate = () => {
     setInput((current) =>
       current.trim()
-        ? `${current}\n\nSQL:\nSELECT * FROM students WHERE score > 80;`
-        : "请基于下面 SQL 生成一个可视化教学演示：\n\nSELECT * FROM students WHERE score > 80;",
+        ? `${current}\n\nSQL:\n-- 在此粘贴你的 SQL，例如 JOIN、子查询、索引优化等\nSELECT ...`
+        : "请基于下面的 SQL 或知识点生成可视化教学演示（6 阶段分步讲解）：\n\n-- 示例可替换为任意 SQL\nSELECT * FROM your_table WHERE your_condition;",
     );
   };
 

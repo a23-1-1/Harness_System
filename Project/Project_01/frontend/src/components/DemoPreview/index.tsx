@@ -633,7 +633,7 @@ function PagePreview({
             <h4 className="mt-4 text-xl font-semibold text-slate-950">{activeStep.title}</h4>
             <p className="mt-3 text-sm leading-7 text-slate-700">{activeStep.content}</p>
             {activeStep.mermaid && isRenderableMermaidCode(activeStep.mermaid) && (
-              <div className="mt-4 max-h-72 overflow-hidden rounded-xl border border-blue-100 bg-white p-4">
+              <div className="mt-4 overflow-auto rounded-xl border border-blue-100 bg-white p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <span className="text-xs font-semibold text-slate-700">课堂图示</span>
                   <span className="font-mono text-[10px] text-slate-400">
@@ -688,7 +688,7 @@ function PagePreview({
                       {step.content}
                     </span>
                     {step.mermaid && isRenderableMermaidCode(step.mermaid) && (
-                      <span className="mt-3 block max-h-56 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <span className="mt-3 block overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4">
                         <span className="mb-3 flex items-center justify-between gap-3">
                           <span className="text-xs font-semibold text-slate-700">步骤图示</span>
                           <span className="font-mono text-[10px] text-slate-400">
@@ -744,7 +744,7 @@ function PlayView({
       </div>
 
       {step?.mermaid && isRenderableMermaidCode(step.mermaid) && (
-        <div className="max-h-72 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="overflow-auto rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-700">可视化</span>
             <span className="font-mono text-[10px] text-slate-500">{step.mermaid_type || "mermaid"}</span>
@@ -839,14 +839,17 @@ function MermaidRenderer({ code, title }: { code: string; title?: string }) {
   }
 
   return (
-    <div className="max-h-64 overflow-hidden">
+    <div className="min-h-[80px] overflow-visible">
       {usedFallback && (
         <p className="mb-2 text-[11px] font-medium text-slate-500">
           原图语法有误，已显示简化示意
         </p>
       )}
-      <div className="flex justify-center overflow-x-auto">
-        <div ref={ref} className="max-w-full" />
+      <div className="flex justify-center overflow-x-auto overflow-y-visible py-1">
+        <div
+          ref={ref}
+          className="max-w-full [&_svg]:h-auto [&_svg]:max-w-full [&_svg]:overflow-visible"
+        />
       </div>
     </div>
   );

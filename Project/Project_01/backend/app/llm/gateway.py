@@ -103,6 +103,8 @@ SQL 查询的 6 阶段按以下对应生成默认 Mermaid 图：
 
 如果用户没有明确要求可视化，选择 1-2 个最关键的阶段添加 mermaid 字段（无需每个阶段都有）。
 
+Mermaid 语法要求：节点标签含冒号、大于号、空格或括号时必须用双引号，例如 `A["Filter: score > 89"]`，禁止写 `A[Filter: score > 89]`；flowchart 必须用节点 ID 连线（`A --> B`），禁止 `["SELECT"] --> ["FROM"]` 匿名链。
+
 当用户输入的是数据库概念（非 SQL）时，按知识点教学逻辑分 3-6 步讲解，每步的 stage 使用教学阶段名称（如 concept、example、summary 等）。
 
 ## P2 专业模拟器输出格式

@@ -21,10 +21,11 @@ def generate_mermaid(sql_analysis: dict, stage: str = "") -> dict:
 
     # 根据不同阶段生成不同 Mermaid 图
     if stage == "lex":
-        # 词法分析 — 流程图展示 token 序列
-        nodes = " --> ".join([f'["{kw}"]' for kw in keywords[:6]])
-        style_target = keywords[0] if keywords else "SELECT"
-        mermaid = f"flowchart LR\n  {nodes}\n  style {style_target} fill:#2563eb,color:#fff"
+        # 词法分析 — 流程图展示 token 序列（须用节点 ID，不能写 ["SELECT"] 匿名链）
+        kws = keywords[:6] or ["SELECT", "FROM", "WHERE"]
+        node_lines = "\n  ".join(f'  T{i}["{kw}"]' for i, kw in enumerate(kws))
+        edge_lines = "\n  ".join(f"  T{i} --> T{i + 1}" for i in range(len(kws) - 1))
+        mermaid = f"flowchart LR\n{node_lines}\n{edge_lines}\n  style T0 fill:#2563eb,color:#fff"
         diagram_type = "flowchart"
         description = f"SQL 关键字识别流程{join_clause}"
 
@@ -67,10 +68,12 @@ def generate_mermaid(sql_analysis: dict, stage: str = "") -> dict:
   Root --> Join["{join_type}"]
   Join --> Result["结果集"]"""
         else:
+            tbl = table_names[0] if table_names else "表"
             mermaid = f"""flowchart TD
-  Scan["扫描: {table_names[0] if table_names else '表'}"]
-  Scan --> Filter["过滤条件"]
-  Filter --> Result["结果集"]"""
+  Scan["Table Scan: {tbl}"]
+  Filter["Filter: 条件过滤"]
+  Result["Project: 结果集"]
+  Scan --> Filter --> Result"""
         diagram_type = "flowchart"
         description = f"执行计划树{join_clause}"
 
